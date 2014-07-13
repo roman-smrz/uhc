@@ -26,7 +26,7 @@
 %%% Subsumption (fitting in) for types
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%%[(1 hmtyinfer) module {%{EH}Ty.FitsIn} import({%{EH}Base.Builtin},{%{EH}Base.Common}, {%{EH}Base.TermLike}, {%{EH}Ty.FitsInCommon}, {%{EH}Ty}, {%{EH}Error}) export (fitsIn)
+%%[(1 hmtyinfer) module {%{EH}Ty.FitsIn} import({%{EH}Base.Builtin},{%{EH}Base.Common}, {%{EH}Base.TermLike}, {%{EH}Ty.FitsInCommon}, {%{EH}Ty}, {%{EH}Error}, {Debug.Trace}) export (fitsIn, fitsInIter)
 %%]
 
 %%[(2 hmtyinfer) import({%{EH}VarMp},{%{EH}Substitutable})
@@ -145,6 +145,7 @@ fiAppSpineLookup
   :: forall gm .
      ( VarLookupCmb VarMp gm
      , VarLookup gm TyVarId VarMpInfo
+     , EqsLookup gm TyVarId Integer
      )
      => FIIn' gm -> HsName -> AppSpineGam -> Maybe AppSpineInfo
 fiAppSpineLookup fi n gappSpineGam
@@ -299,6 +300,7 @@ fitsIn
      => -} 
      ( VarLookup gm TyVarId VarMpInfo
      , VarLookupCmb VarMp gm
+     , EqsLookup gm TyVarId Integer
      )
      => FIOpts -> FIEnv -> UID -> gm -> Ty -> Ty
      -> FIOut
@@ -311,6 +313,33 @@ fitsIn opts env uniq varmp
 %%[[8
           , fiEnv = env
 %%]]
+          }
+        ) :: FIIn' gm
+       )
+
+fitsInIter
+  :: forall gm .
+     {- ( VarUpdatable Ty gm
+     , VarLookupCmb VarMp gm
+     , VarLookupCmb gm gm
+     )
+     => -} 
+     ( VarLookup gm TyVarId VarMpInfo
+     , VarLookupCmb VarMp gm
+     , EqsLookup gm TyVarId Integer
+     )
+     => FIOpts -> FIEnv -> UID -> gm -> LinEqs TyVarId Integer -> Ty -> Ty
+     -> FIOut
+fitsInIter opts env uniq varmp itermp
+  =  fitsInFI
+       ((emptyFI
+          { fiUniq = uniq
+          , fiFIOpts = opts
+          , fiVarMp = varmp
+%%[[8
+          , fiEnv = env
+%%]]
+          , fiLinEqs = itermp
           }
         ) :: FIIn' gm
        )
@@ -329,12 +358,22 @@ fitsInFI
      => -} 
      ( VarLookup gm TyVarId VarMpInfo
      , VarLookupCmb VarMp gm
+     , EqsLookup gm TyVarId Integer
      )
      => FIIn' gm -> Ty -> Ty
      -> FIOut
 %%]]
 fitsInFI fi ty1 ty2
-  =  foRes {foTrace = reverse $ foTrace foRes}
+  =  {- trace (
+        "fitsInFI:\n" ++
+        show (ppTyWithFI fi ty1)
+        ++ "\n" ++
+        show (ppTyWithFI fi ty2)
+        ++ "\n" ++
+        show (ppVarMpV (foVarMp foRes))
+        ++ "\n" ++
+        show (ppTy $ foTy foRes)
+      ) $ -} foRes {foTrace = reverse $ foTrace foRes}
   where
 %%[[4
             appSpineGam             =  feAppSpineGam $ fiEnv fi
@@ -503,6 +542,7 @@ fitsInFI fi ty1 ty2
 %%[[7
                                   , foDontBind = fioDontBind (fiFIOpts fi)
 %%]]
+				  , foLinEqs = fiLinEqs fi
                                   }
             fofi       fo fi = -- (\x -> Debug.tr "fofi" ((pp $ show $ fioDontBind o) >-< (pp $ show $ foDontBind fo) >-< (pp $ show $ fioDontBind $ fiFIOpts x)) x)
                                fi { fiVarMpLoc = foVarMp    fo, fiUniq = foUniq fo, fiTrace = foTrace fo
@@ -1639,6 +1679,29 @@ GADT: when encountering a product with eq-constraints on the outset, remove them
                        isRec = hsnIsRec n1
                        isSum = hsnIsSum n1
                        fo = fRow fi tr1 tr2 isRec isSum
+
+{-
+            fBase fi updTy t1@(Ty_MbApp (Ty_Con n1) tr1)
+                           t2@(Ty_App (Ty_Con n2) tr2)
+                | n1 == n2 && (isRec || isSum)
+                = foUpdTy (updTy $ n1 `appConApp` [foTy fo]) fo
+                where  -- decompose
+                       -- the work
+                       isRec = hsnIsRec n1
+                       isSum = hsnIsSum n1
+                       fo = fRow fi tr1 tr2 isRec isSum
+
+            fBase fi updTy t1@(Ty_App (Ty_Con n1) tr1)
+                           t2@(Ty_MbApp (Ty_Con n2) tr2)
+                | n1 == n2 && (isRec || isSum)
+                = foUpdTy (updTy $ n1 `appConApp` [foTy fo]) fo
+                where  -- decompose
+                       -- the work
+                       isRec = hsnIsRec n1
+                       isSum = hsnIsSum n1
+                       fo = fRow fi tr1 tr2 isRec isSum
+		-}
+
 %%]
             fBase fi updTy t1@(Ty_App ta1 tr1)
                            t2@(Ty_App ta2 tr2)
@@ -1729,6 +1792,96 @@ GADT: when encountering a product with eq-constraints on the outset, remove them
 %%]]
 %%]
 
+%%[(7 hmtyinfer).fitsIn.IterApp
+            fBase fi updTy (Ty_IterApp e1 (Ty_Con c1) (Ty_IterApp e2 (Ty_Con c2) t1)) t2
+                | c1 == c2 = fVar' fBase fi updTy (Ty_IterApp (e1+e2) (Ty_Con c1) t1) t2
+
+            fBase fi updTy (Ty_IterApp e1 (Ty_Con c1) (Ty_App (Ty_Con c2) t1)) t2
+                | c1 == c2 = fVar' fBase fi updTy (Ty_IterApp (e1+1) (Ty_Con c1) t1) t2
+
+            fBase fi updTy (Ty_IterApp e1 (Ty_Con c1) t1) (Ty_App (Ty_Con c2) t2)
+                | c1 == c2 = fVar' fBase fi updTy (Ty_IterApp (e1-1) (Ty_Con c1) t1) t2
+
+            fBase fi updTy t1 (Ty_IterApp e1 (Ty_Con c1) (Ty_IterApp e2 (Ty_Con c2) t2))
+                | c1 == c2 = fVar' fBase fi updTy t1 (Ty_IterApp (e1+e2) (Ty_Con c1) t2)
+
+            fBase fi updTy t1 (Ty_IterApp e2 (Ty_Con c1) (Ty_App (Ty_Con c2) t2))
+                | c1 == c2 = fVar' fBase fi updTy t1 (Ty_IterApp (e2+1) (Ty_Con c1) t2)
+
+            fBase fi updTy (Ty_App (Ty_Con c1) t1) (Ty_IterApp e2 (Ty_Con c2) t2)
+                | c1 == c2 = fVar' fBase fi updTy t1 (Ty_IterApp (e2-1) (Ty_Con c1) t2)
+
+            fBase fi updTy (Ty_IterApp e1 (Ty_Con c1) t1) (Ty_IterApp e2 (Ty_Con c2) t2)
+                | c1 == c2 = fVar' fBase fi updTy (Ty_IterApp (e1-e2) (Ty_Con c1) t1) t2
+
+            fBase fi updTy (Ty_IterApp expr tf t1@(Ty_Var _ TyVarCateg_Plain)) t2
+                = fVar' fBase fi updTy t1 (Ty_IterApp (-expr) tf t2)
+
+            fBase fi updTy t1 (Ty_IterApp expr tf t2@(Ty_Var _ TyVarCateg_Plain))
+                = fVar' fBase fi updTy (Ty_IterApp (-expr) tf t1) t2
+
+            fBase fi updTy t1@(Ty_IterApp expr tf1 ta1) t2
+                = case trm "fi1" ((\p -> p >#< t1 >#< t2) . (either pp $ pp.show)) $ fiEvalExpr fi expr of
+                       Left i | i >= 0 -> fVar' fBase fi updTy (iterate (Ty_App tf1) ta1 !! fromIntegral i) t2
+                              | otherwise -> fVar' fBase fi updTy ta1 (iterate (Ty_App tf1) t2 !! fromIntegral (-i))
+                       Right e -> case addEquation e (getEqs $ fiVarMpLoc fi) of
+                                       Just eqs -> fVar' fBase (fi { fiVarMpLoc = mapEqs (const eqs) (fiVarMpLoc fi) }) updTy ta1 t2
+
+            fBase fi updTy t1 t2@(Ty_IterApp expr tf2 ta2)
+                = case trm "fi2" ((\p -> p >#< t1 >#< t2) . (either pp $ pp.show)) $ fiEvalExpr fi expr of
+                       Left i | i >= 0 -> fVar' fBase fi updTy t1 (iterate (Ty_App tf2) ta2 !! fromIntegral i)
+                              | otherwise -> fVar' fBase fi updTy (iterate (Ty_App tf2) t1 !! fromIntegral (-i)) ta2
+                       Right e -> case addEquation e (getEqs $ fiVarMpLoc fi) of
+                                       Just eqs -> fVar' fBase (fi { fiVarMpLoc = mapEqs (const eqs) (fiVarMpLoc fi) }) updTy t1 ta2
+{-
+	    fBase fi updTy (Ty_MbApp tv use tf1 ta1) t2
+		| Just (Ty_MbApp _ use' _ _) <- fiLookupTyVarCyc fi tv
+		= if use' == use then fVar' fBase fi updTy (Ty_App tf1 ta1) t2
+                                 else fVar' fBase fi updTy ta1 t2
+
+	    fBase fi updTy t1 (Ty_MbApp tv use tf2 ta2)
+		| Just (Ty_MbApp _ use' _ _) <- fiLookupTyVarCyc fi tv
+		= if use' == use then fVar' fBase fi updTy t1 (Ty_App tf2 ta2)
+                                 else fVar' fBase fi updTy t1 ta2
+
+            fBase fi updTy t1@(Ty_MbApp tv use tc@(Ty_Con c1) ta1)
+                           t2@(Ty_App (Ty_Con c2) ta2)
+		| c1 == c2  = let fo = fVar' fBase fi updTy ta1 (Ty_MbApp tv (not use) tc ta2)
+                               in foUpdTy (Ty_MbApp tv use tc $ foTy fo) fo
+		| otherwise = foUpdVarMp (tv `varmpTyUnit` Ty_MbApp tv (not use) tc Ty_Any) $
+                           fVar' fBase (fi { fiVarMp = tv `varmpTyUnit` (Ty_MbApp tv (not use) tc Ty_Any) |+> fiVarMp fi }) updTy ta1 t2
+
+            fBase fi updTy t1@(Ty_App (Ty_Con c1) ta1)
+                           t2@(Ty_MbApp tv use tc@(Ty_Con c2) ta2)
+		| c1 == c2  = let fo = fVar' fBase fi updTy (Ty_MbApp tv (not use) tc ta1) ta2
+                               in foUpdTy (Ty_MbApp tv use tc $ foTy fo) fo
+		| otherwise = foUpdVarMp (tv `varmpTyUnit` Ty_MbApp tv (not use) tc Ty_Any) $
+                           fVar' fBase (fi { fiVarMp = tv `varmpTyUnit` (Ty_MbApp tv (not use) tc Ty_Any) |+> fiVarMp fi }) updTy t1 ta2
+
+            fBase fi updTy t1@(Ty_MbApp tv use tc ta1)
+                           t2@(Ty_Con _)
+		= foUpdVarMp (tv `varmpTyUnit` Ty_MbApp tv (not use) tc Ty_Any) $ 
+                    fVar' fBase (fi { fiVarMp = tv `varmpTyUnit` (Ty_MbApp tv (not use) tc Ty_Any) |+> fiVarMp fi }) updTy ta1 t2
+
+	    fBase fi updTy t1@(Ty_Con _)
+	                   t2@(Ty_MbApp tv use tc ta2)
+		= foUpdVarMp (tv `varmpTyUnit` Ty_MbApp tv (not use) tc Ty_Any) $ 
+                    fVar' fBase (fi { fiVarMp = tv `varmpTyUnit` (Ty_MbApp tv (not use) tc Ty_Any) |+> fiVarMp fi }) updTy t1 ta2
+
+            -- TODO
+            {-
+            fBase fi updTy t1@(Ty_MbApp tv1 use1 tc1 ta1)
+                           t2@(Ty_MbApp tv2 use2 tc2 ta2)
+                = foUpdVarMp (tv1 `varmpTyUnit` Ty_MbApp tv1 (not use1) tc1 Ty_Any) $
+                    foUpdVarMp (tv2 `varmpTyUnit` Ty_MbApp tv2 (not use2) tc2 Ty_Any) $
+                        fVar' fBase (
+                            fi { fiVarMp = tv1 `varmpTyUnit` (Ty_MbApp tv1 (not use1) tc1 Ty_Any) |+> tv2 `varmpTyUnit` (Ty_MbApp tv2 (not use2) tc2 Ty_Any) |+> fiVarMp fi }
+                            ) updTy ta1 ta2
+            -}
+-}
+%%]
+
+
 %%[(7 hmtyinfer).fitsIn.Ext
             fBase fi updTy t1@(Ty_Ext _ _ _)   t2@(Ty_Ext _ _ _)
                 =  fRow fi t1 t2 False False
@@ -1810,6 +1963,7 @@ fitsInFold opts env uniq varmp tyl
 fitPredIntoPred
   :: ( VarLookupCmb VarMp gm
      , VarLookup gm TyVarId VarMpInfo
+     , EqsLookup gm TyVarId Integer
      )
      => FIIn' gm -> Pred -> Pred
      -> Maybe (Pred,VarMp)
@@ -1911,8 +2065,8 @@ fitPredIntoPred fi pr1 pr2
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%[(9 hmtyinfer) export(fitPredToEvid')
-fitPredToEvid' :: UID -> VarMp -> Ty -> Either ClGamInfo ClGam -> FIOut
-fitPredToEvid' u varmp prTy gg
+fitPredToEvid' :: UID -> VarMp -> LinEqs TyVarId Integer -> Ty -> Either ClGamInfo ClGam -> FIOut
+fitPredToEvid' u varmp iter prTy gg
   =  case prTy of
        Ty_Any  ->  emptyFO
        _       ->  fPr u prTy
@@ -1926,7 +2080,7 @@ fitPredToEvid' u varmp prTy gg
                     where fClgi u clgi prTy
                             = fo {foTy = appUnArrRes (foTy fo)}
                             where (u',u1,u2) = mkNewLevUID2 u
-                                  fo = fitsIn (predFIOpts {fioBindRVars = FIOBindNoBut $ Set.singleton u2}) emptyFE u1 varmp (clgiPrToEvidTy clgi) ([prTy] `appArr` mkTyVar u2)
+                                  fo = fitsInIter (predFIOpts {fioBindRVars = FIOBindNoBut $ Set.singleton u2}) emptyFE u1 varmp iter (clgiPrToEvidTy clgi) ([prTy] `appArr` mkTyVar u2)
                  Ty_Pred (Pred_Pred t)
                     ->  let  (aL,r) = appUnArr t
                              (_,aLr'@(r':aL')) = foldr (\t (u,ar) -> let (u',u1) = mkNewLevUID u in (u',fPr u1 t : ar)) (u,[]) (r : aL)
@@ -1934,8 +2088,8 @@ fitPredToEvid' u varmp prTy gg
 %%]
 
 %%[(9 hmtyinfer) export(fitPredToEvid)
-fitPredToEvid :: UID -> VarMp -> Ty -> ClGam -> FIOut
-fitPredToEvid u varmp prTy g = fitPredToEvid' u varmp prTy (Right g)
+fitPredToEvid :: UID -> VarMp -> LinEqs TyVarId Integer -> Ty -> ClGam -> FIOut
+fitPredToEvid u varmp iter prTy g = fitPredToEvid' u varmp iter prTy (Right g)
 %%]
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

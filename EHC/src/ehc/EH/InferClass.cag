@@ -281,7 +281,7 @@ SEM Decl
   | InstanceIntro
                 loc             .   (instClsNm,_)   =   tyPredMatchNmArgs @prExpr.ty
                                 .   dictNm          =   maybe (poiHNm @instId) id @mbNmElim
-                loc             .   foPr            =   fitPredToEvid @lUniq emptyVarMp @prExpr.ty @lhs.clGam
+                loc             .   foPr            =   fitPredToEvid @lUniq emptyVarMp emptySystem @prExpr.ty @lhs.clGam
                 expr            .   knTy            =   foTy @foPr
                                 .   tyVarMp         =   foVarMp @foPr `varUpd` @lhs.tyVarMp
 %%]

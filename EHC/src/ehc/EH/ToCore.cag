@@ -188,7 +188,7 @@ SEM Expr
 %%][9
                 loc         .   (cexprapp,cexprappCSubst)
 %%]]
-                                            =   let mkapp f = wr $ acore1App f @arg.cexpr
+                                            =   let mkapp f = wr $ acore1App f (@mbAppCorArg @arg.cexpr)
 %%[[(8 coresysf)
                                                     wr      = @sysfcTyArgLamWrap . @sysfcTyArgAppWrap
 %%][8
@@ -1534,7 +1534,7 @@ mkDataGenerBinds
                 (dictSelfNm,dictBuildNm) = mkInstanceBuildNms dictNm
                 
                 -- match predicate to get the record type describing fields of dictionary
-                evFO  = fitPredToEvid' u1 emptyVarMp (mkTyPr pr) (Left clgi)
+                evFO  = fitPredToEvid' u1 emptyVarMp emptySystem (mkTyPr pr) (Left clgi)
                 recTy = foVarMp evFO `varUpd` foTy evFO
                 
                 -- the bindings for datatypes acting as labels

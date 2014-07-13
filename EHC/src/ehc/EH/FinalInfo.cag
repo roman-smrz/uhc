@@ -54,14 +54,15 @@ SEM AGItf
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%[(2 hmtyinfer).finValGam
-ATTR AllNT [ finTyVarMp: VarMp | | ]
+ATTR AllNT [ finTyVarMp: VarMp  finIterLinEqs: {LinEqs TyVarId Integer} | | ]
 
 SEM AGItf
-  | AGItf       loc         .   finTyVarMp          =   
+  | AGItf       loc         .   finTyVarMp          =   varmpEqMap groundAllVars $
 %%[[9
                                                         @chrSolveSimpTyVarMp `varUpd`
 %%]]
                                                         @expr.tyVarMp
+                            .   finIterLinEqs       =   @expr.iterLinEqs
 %%]
 
 %%[(9 hmtyinfer)
@@ -237,25 +238,25 @@ SEM Expr
 
 %%[(8 hmtyinfer codegen coresysf)
 SEM Expr
-  | Var Con     loc         .   fo_fin      =   @doFit (fioMkFinal @lhs.fiOpts) @lhs.finTyVarMp
-  | Lam         loc         .   fo_fin      =   @doFit (fioMkFinal @knFunFIOpts) @lhs.finTyVarMp
+  | Var Con     loc         .   fo_fin      =   @doFit (fioMkFinal @lhs.fiOpts) @lhs.finTyVarMp @lhs.finIterLinEqs
+  | Lam         loc         .   fo_fin      =   @doFit (fioMkFinal @knFunFIOpts) @lhs.finTyVarMp @lhs.finIterLinEqs
 %%[[9
-  | AppTop      loc         .   fo_fin      =   @doFit (fioMkFinal @lhs.fiOpts) @lhs.finTyVarMp
+  | AppTop      loc         .   fo_fin      =   @doFit (fioMkFinal @lhs.fiOpts) @lhs.finTyVarMp @lhs.finIterLinEqs
 %%]]
 %%[[12
-  | LamImpl     loc         .   fo_fin      =   @doFit (implFIOpts {fioBindRFirst=True, fioExpandEqTyVar=True}) @lhs.finTyVarMp
+  | LamImpl     loc         .   fo_fin      =   @doFit (implFIOpts {fioBindRFirst=True, fioExpandEqTyVar=True}) @lhs.finTyVarMp @lhs.finIterLinEqs
 %%]]
 %%]
 
 %%[(8 hmtyinfer codegen coresysf)
 SEM Decl
   | Val         loc         .   doFit       =   \o m t2 -> fitsIn o @fe @lUniq_fo m @expr.ty t2
-                            .   fo_fin      =   @doFit (fioMkFinal @exprFiOpts) @lhs.finTyVarMp @finalTy
+                            .   fo_fin      =   @doFit (fioMkFinal @exprFiOpts) @lhs.finTyVarMp @finalTy @lhs.finIterLinEqs
                 loc         .   lUniq_fo    :   UNIQUEREF gUniq
 
 SEM DataConstr
   | Constr      loc         .   doFit       =   \o m -> fitsIn o @fe @lUniq_fo m @dataConTy @dataConTyAsVar
-                            .   fo_fin      =   @doFit (strongFIOpts {fioExpandEqTyVar=True}) @lhs.finTyVarMp
+                            .   fo_fin      =   @doFit (strongFIOpts {fioExpandEqTyVar=True}) @lhs.finTyVarMp @lhs.finIterLinEqs
                 loc         .   lUniq_fo    :   UNIQUEREF gUniq
 %%]
 

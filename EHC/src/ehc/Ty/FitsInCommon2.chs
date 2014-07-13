@@ -28,6 +28,9 @@ For debug/trace:
 %%[(4 hmtyinfer) import(UHC.Util.Pretty)
 %%]
 
+%%[(1 hmtyinfer) import({%{EH}LinEqs})
+%%]
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Trace/debug PP
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -68,6 +71,7 @@ data FIIn' globvm
       , fiCoeCtx		  ::  CoeCtx				-- the coercion context
       , fiEnv             ::  !FIEnv                -- environment (Gam's,...)
 %%]]
+      ,  fiLinEqs          :: LinEqs TyVarId Integer
       }
 
 type FIIn = FIIn' VarMp
@@ -90,6 +94,7 @@ emptyFI' m
       , fiCoeCtx		  =   CoeCtx_Allow
       , fiEnv             =   emptyFE
 %%]]
+      , fiLinEqs          =   emptySystem
       }
 
 -- emptyFI :: forall gm . FIIn' gm
@@ -121,6 +126,11 @@ fiLookupReplaceTyCyc :: FIIn -> Ty -> Ty
 fiLookupReplaceTyCyc :: VarLookup gm TyVarId VarMpInfo => FIIn' gm -> Ty -> Ty
 %%]]
 fiLookupReplaceTyCyc  fi t  =  maybe t (maybe t id . fiLookupTyVarCyc fi) $ tyMbVar t
+%%]
+
+%%[8 export(fiEvalExpr)
+fiEvalExpr :: EqsLookup gm TyVarId Integer => FIIn' gm -> LinExpr TyVarId Integer -> Either Integer (LinExpr TyVarId Integer)
+fiEvalExpr fi expr = (evalLinExpr $ getEqs $ fiVarMp fi) =<< (evalLinExpr $ getEqs $ fiVarMpLoc fi) expr
 %%]
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

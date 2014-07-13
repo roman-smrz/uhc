@@ -54,7 +54,10 @@ A multiple level VarMp knows its own absolute metalevel, which is the default to
 %%[(4_2) export(tyAsVarMp',varmpTyRevUnit)
 %%]
 
-%%[6 import(UHC.Util.VarMp) export(module UHC.Util.VarMp)
+%%[6 import({%{EH}VarMpEq}) export(module {%{EH}VarMpEq})
+%%]
+
+%%[6 import(qualified UHC.Util.VarMp as VM) export(VM.VarMp'(..), VM.VarMpStk', VM.emptyVarMpStk, VM.varmpstkUnit, VM.varmpstkKeysSet, VM.varmpstkUnions, VM.varmpstkToAssocL)
 %%]
 
 %%[6 import({%{EH}VarLookup}) export(module {%{EH}VarLookup})
@@ -160,13 +163,13 @@ varmpToAssocL = varmpToAssocTyL
 %%]
 
 %%[(6 hmtyinfer || hmtyast).assocTyLToVarMp -4.assocTyLToVarMp export(assocMetaLevTyLToVarMp,assocTyLToVarMp,varmpToAssocTyL)
-assocMetaLevTyLToVarMp :: Ord k => AssocL k (MetaLev,Ty) -> VarMp' k VarMpInfo
+assocMetaLevTyLToVarMp :: Ord k => AssocL k (MetaLev,Ty) -> VarMpEq k VarMpInfo
 assocMetaLevTyLToVarMp = assocMetaLevLToVarMp . assocLMapElt (\(ml,t) -> (ml, VMITy t)) -- varmpUnions [ varmpMetaLevTyUnit lev v t | (v,(lev,t)) <- l ]
 
-assocTyLToVarMp :: Ord k => AssocL k Ty -> VarMp' k VarMpInfo
+assocTyLToVarMp :: Ord k => AssocL k Ty -> VarMpEq k VarMpInfo
 assocTyLToVarMp = assocLToVarMp . assocLMapElt VMITy
 
-varmpToAssocTyL :: VarMp' k VarMpInfo -> AssocL k Ty
+varmpToAssocTyL :: VarMpEq k VarMpInfo -> AssocL k Ty
 varmpToAssocTyL c = [ (v,t) | (v,VMITy t) <- varmpToAssocL c ]
 %%]
 
@@ -275,16 +278,17 @@ type VarMp  = VarMp' VarId Ty
 20080610, AD, todo: use TvPurpose
 
 %%[6 -2.VarMp.Base export(VarMp)
-type VarMp  = VarMp' VarId VarMpInfo
+--type VarMp  = VarMp' VarId VarMpInfo
+type VarMp  = VarMpEq VarId VarMpInfo
 %%]
 
 %%[(4 hmtyinfer).varmpFilterTy export(varmpFilterTy)
-varmpFilterTy :: (k -> v -> Bool) -> VarMp' k v -> VarMp' k v
+varmpFilterTy :: (k -> v -> Bool) -> VarMpEq k v -> VarMpEq k v
 varmpFilterTy = varmpFilter
 %%]
 
 %%[(6 hmtyinfer).varmpFilterTy -4.varmpFilterTy export(varmpFilterTy)
-varmpFilterTy :: Ord k => (k -> Ty -> Bool) -> VarMp' k VarMpInfo -> VarMp' k VarMpInfo
+varmpFilterTy :: Ord k => (k -> Ty -> Bool) -> VarMpEq k VarMpInfo -> VarMpEq k VarMpInfo
 varmpFilterTy f
   = varmpFilter
 %%[[6
@@ -307,8 +311,8 @@ varmpTailAddOcc _ x                 = (x,emptyVarMp)
 
 %%[(9 hmtyinfer) export(varmpMapThr,varmpMapThrTy)
 varmpMapThr :: (MetaLev -> TyVarId -> VarMpInfo -> thr -> (VarMpInfo,thr)) -> thr -> VarMp -> (VarMp,thr)
-varmpMapThr f thr (VarMp l ms)
-  = (VarMp l ms',thr')
+varmpMapThr f thr vm@(VarMpEq { vmMap = VM.VarMp l ms })
+  = (vm { vmMap = VM.VarMp l ms'},thr')
   where (ms',thr') = foldMlev thr ms
         foldMp mlev thr fm
           = Map.foldrWithKey
@@ -366,10 +370,10 @@ varmpTyUnit = varmpSingleton
 %%]
 
 %%[(6 hmtyinfer || hmtyast).VarMp.varmpTyUnit -2.VarMp.varmpTyUnit export(varmpMetaLevTyUnit,varmpTyUnit)
-varmpMetaLevTyUnit :: Ord k => MetaLev -> k -> Ty -> VarMp' k VarMpInfo
+varmpMetaLevTyUnit :: Ord k => MetaLev -> k -> Ty -> VarMpEq k VarMpInfo
 varmpMetaLevTyUnit mlev v t = varmpMetaLevSingleton mlev v (VMITy t)
 
-varmpTyUnit :: Ord k => k -> Ty -> VarMp' k VarMpInfo
+varmpTyUnit :: Ord k => k -> Ty -> VarMpEq k VarMpInfo
 varmpTyUnit = varmpMetaLevTyUnit metaLevVal
 %%]
 
@@ -441,8 +445,8 @@ tyAsVarMp = tyAsVarMp' (flip const)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%[(2 hmtyinfer || hmtyast).varmpTyLookup export(varmpTyLookup)
-varmpTyLookup, varmpLookup :: Eq k => k -> VarMp' k v -> Maybe v
-varmpTyLookup tv (VarMp s) = lookup tv s
+varmpTyLookup, varmpLookup :: Eq k => k -> VarMp -> Maybe v
+varmpTyLookup tv (VarMpEq { vmMap = (VarMp s) }) = lookup tv s
 
 varmpLookup = varmpTyLookup
 %%]

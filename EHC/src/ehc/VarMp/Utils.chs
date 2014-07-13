@@ -36,8 +36,8 @@ varmpGraphVisit
   :: VarIdS
      -> VarMp
      -> VarMp
-varmpGraphVisit start (VarMp l (m:ms))
-  = VarMp l (m':ms)
+varmpGraphVisit start vm@(VarMpEq { vmMap = VarMp l (m:ms) })
+  = vm { vmMap = VarMp l (m':ms) }
   where m'
           = graphVisit (\newm m tvar
                          -> case Map.lookup tvar m of

@@ -40,6 +40,10 @@ For debug/trace:
 %%[(4 hmtyinfer) import(UHC.Util.Pretty)
 %%]
 
+
+%%[(1 hmtyinfer) import({%{EH}LinEqs})
+%%]
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Tracing info, specialized  for fitsIn and related functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -117,6 +121,7 @@ data FIOut
        ,  foMkDT            :: Maybe PP_Doc -> String -> VarMp -> VarMp -> (PP_Doc,VarMp)
 %%][100
 %%]]
+       ,  foLinEqs          :: LinEqs TyVarId Integer
        }
 %%]
 
@@ -159,6 +164,7 @@ emptyFO
        ,  foMkDT            =   \_ _ _ dm -> (empty,dm)
 %%][100
 %%]]
+       ,  foLinEqs          =   emptySystem
        }
 %%]
 

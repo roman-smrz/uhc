@@ -37,6 +37,9 @@ Substitution over a meta level higher is the same as over the current level, exc
 %%[(6 hmtyinfer || hmtyast) hs import({%{EH}Base.Debug},UHC.Util.Pretty,{%{EH}Ty.Pretty})
 %%]
 
+%%[(1 hmtyinfer) hs import({%{EH}LinEqs})
+%%]
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Wrapping
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -58,9 +61,9 @@ tyAppVarLookup varmp ty
 %%[[4
 tyAppVarLookup' :: SubstOpts -> VarMp -> TVUseMp -> Ty -> (Ty,VarMp)
 %%][6
-tyAppVarLookup' :: VarLookup m TyVarId VarMpInfo => SubstOpts -> m -> TVUseMp -> Ty -> (Ty,VarMp)
+tyAppVarLookup' :: VarLookup m TyVarId VarMpInfo => SubstOpts -> m -> LinEqs TyVarId Integer -> TVUseMp -> Ty -> (Ty,VarMp)
 %%]]
-tyAppVarLookup' opts m usemp ty
+tyAppVarLookup' opts m iter usemp ty
   = (repl_Syn_TyAGItf t,cycVarMp_Syn_TyAGItf t)
   where t = wrap_TyAGItf
               (sem_TyAGItf (TyAGItf_AGItf ty))
@@ -68,24 +71,25 @@ tyAppVarLookup' opts m usemp ty
                  { substOpts_Inh_TyAGItf 	= opts
                  , tvUseMp_Inh_TyAGItf 		= usemp
                  , lkup_Inh_TyAGItf 		= mkLkup m
+                 , iter_Inh_TyAGItf             = iter
                  })
 
 %%[[4
 tyAppVarLookup :: VarMp -> Ty -> Ty
 %%][6
-tyAppVarLookup :: VarLookup m TyVarId VarMpInfo => m -> Ty -> Ty
+tyAppVarLookup :: VarLookup m TyVarId VarMpInfo => LinEqs TyVarId Integer -> m -> Ty -> Ty
 %%]]
-tyAppVarLookup m ty
+tyAppVarLookup iter m ty
   = ty'
-  where (ty',_) = tyAppVarLookup' defaultOpts m Map.empty ty
+  where (ty',_) = tyAppVarLookup' defaultOpts m iter Map.empty ty
 
 %%[[4
 tyAppVarLookup2 :: VarMp -> Ty -> (Ty,VarMp)
 %%][6
-tyAppVarLookup2 :: VarLookup m TyVarId VarMpInfo => m -> Ty -> (Ty,VarMp)
+tyAppVarLookup2 :: VarLookup m TyVarId VarMpInfo => LinEqs TyVarId Integer -> m -> Ty -> (Ty,VarMp)
 %%]]
-tyAppVarLookup2 m ty
-  = tyAppVarLookup' defaultOpts m Map.empty ty
+tyAppVarLookup2 iter m ty
+  = tyAppVarLookup' defaultOpts m iter Map.empty ty
 %%]
 
 %%[(4 hmtyinfer || hmtyast).substOpts hs
@@ -135,7 +139,7 @@ mkLkup m = \mlev v -> {- trm "Subst.lkup" (\r -> mlev >#< v >#< r) $ -} varlooku
 %%]
 
 %%[(2 hmtyinfer || hmtyast)
-ATTR TyAGItf AllTy [ lkup: Lkup | | ]
+ATTR TyAGItf AllTy [ lkup: Lkup  iter: {LinEqs TyVarId Integer} | | ]
 %%]
 
 %%[(3 hmtyinfer || hmtyast)
@@ -372,6 +376,10 @@ SEM Ty
                                             :=  if @isRepl
                                                 then tvRepl3 @tv @tvUse varmpTyUnit @repl @replv @repl'.repl @repl'.cycVarMp
                                                 else (@repl,emptyVarMp)
+
+  | IterApp         lhs     .   repl        := case trm "sbs" (\e -> show @iter >#< " -> " >#< either pp (pp.show) e) $ evalLinExpr @lhs.iter @iter of
+                                                    Left i -> (!!fromIntegral i) $ iterate (Ty_App @func.repl) @arg.repl
+                                                    Right e -> Ty_IterApp e @func.repl @arg.repl
 %%]
 
 %%[(6 hmtyinfer || hmtyast)

@@ -318,14 +318,16 @@ SEM Decl
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%[(2 hmtyinfer).tyVarMp
-ATTR AllDecl [ | tyVarMp: VarMp  patTyVarMp: VarMp | ]
+ATTR AllDecl [ | tyVarMp: VarMp  patTyVarMp: VarMp  iterLinEqs: (LinEqs TyVarId Integer) | ]
 
 SEM AGItf
   | AGItf       expr        .   tyVarMp             =   emptyVarMp
+                            .   iterLinEqs          =   emptySystem
+                            .   finIterLinEqs       =   groundAllVars @expr.iterLinEqs
 %%]
 
 %%[(2 hmtyinfer).tyVarMp
-ATTR AllExpr [ | tyVarMp: VarMp | ]
+ATTR AllExpr [ | tyVarMp: VarMp  iterLinEqs: (LinEqs TyVarId Integer) | ]
 %%]
 
 %%[(2 hmtyinfer).tyNtyVarMp
@@ -333,12 +335,12 @@ ATTR AllPatExpr [ | patTyVarMp: VarMp | ]
 %%]
 
 %%[(5 hmtyinfer)
-ATTR AllCase [ | tyVarMp: VarMp   patTyVarMp: VarMp | ]
+ATTR AllCase [ | {- finIterLinEqs: (Map TyVarId Integer) -} tyVarMp: VarMp   patTyVarMp: VarMp  iterLinEqs: (LinEqs TyVarId Integer) | ]
 ATTR AllDataConstr AllData [ | patTyVarMp: VarMp | ]
 %%]
 
 %%[(97 hmtyinfer)
-ATTR AllPatExpr [ | tyVarMp: VarMp | ]
+ATTR AllPatExpr [ | {- finIterLinEqs: (Map TyVarId Integer) -} tyVarMp: VarMp  iterLinEqs: (LinEqs TyVarId Integer) | ]
 %%]
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -351,6 +353,7 @@ SEM Decl
   | Val         patExpr     .   patTyVarMp          =   @lhs.patTyVarMp
                 lhs         .   patTyVarMp          =   @patExpr.patTyVarMp
                 expr        .   tyVarMp             =   @lhs.tyVarMp
+                --expr        .   iterLinEqs          =   @lhs.iterLinEqs
 %%]
 
 %%[(97 hmtyinfer) -5.tyVarMp.Val
