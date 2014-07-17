@@ -454,6 +454,7 @@ ehcCmdLineOpts
 %%[[(8 codegen javascript)
      ,  Option ""   ["js"]                  (ReqArg oOptJavaScript "opt[,...]")     ("opts (specific) for javascript: " ++ showStr2stMp javaScriptOptMp)
 %%]]
+     ,  Option ""   ["autolift"]            (NoArg oAutolift)                       "automatic lifting for Maybe"
      ]
 %%]
 %%[1
@@ -745,6 +746,7 @@ ehcCmdLineOpts
                                  opts _                      o = o
 %%][100
 %%]]
+         oAutolift              o   = o { ehcOptAutolift             = True    }
 %%]
 
 %%[99

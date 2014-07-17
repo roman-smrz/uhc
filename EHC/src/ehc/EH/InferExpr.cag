@@ -244,7 +244,9 @@ SEM Expr
                 loc         .   (knFunTy,imTy,argTy,ivar):=let [i,a,ivar] = mkNewUIDL 3 @lUniq
                                                                im = mkImplsVar i
                                                                at = mkTyVar a
-                                                               lcon = Ty_IterApp (LinExpr [(ivar,1)] 0) (Ty_Con (mkHNm "UHC.Base.Maybe"))
+                                                               lcon = if ehcOptAutolift @lhs.opts
+                                                                         then Ty_IterApp (LinExpr [(ivar,1)] 0) (Ty_Con (mkHNm "UHC.Base.Maybe"))
+                                                                         else id
                                                             in ([im,lcon at] `appArr` @lhs.knTy,im,at,ivar)
                 loc         .   ty_                 :=  @lhs.knTy
                 loc         .   (prOccL,implsTl)    =   implsPredsTailWithLkup (varmpImplsLookupCyc2 @arg.tyVarMp) @lhs.predScope $ tyImplsWithLkup (varmpTyLookupCyc2 @arg.tyVarMp) @imTy

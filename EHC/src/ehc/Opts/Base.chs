@@ -326,6 +326,7 @@ data EHCOpts
       ,  ehcOptExecOptsMp	  ::  Map.Map FilePath [ExecOpt]
       												-- default options for commands
 %%]]
+      ,  ehcOptAutolift       ::  Bool
       }
 %%]
 
@@ -494,6 +495,7 @@ emptyEHCOpts
       ,  ehcOptPgmExecMp		= 	Map.empty
       ,  ehcOptExecOptsMp		=   Map.empty
 %%]]
+      ,  ehcOptAutolift         =   False
       }
 %%]
 
