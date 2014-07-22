@@ -19,6 +19,7 @@ import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe
 import Data.Ord
+import qualified Data.Set as S
 import Data.Traversable
 
 import UHC.Util.Serialize
@@ -118,8 +119,11 @@ groundVar v ds = case getVar v ds of
                       Nothing -> let Just ds' = addEquation (LinExpr [(v, 1)] 0) ds
                                   in ds'
 
+groundVars :: (Ord var, Integral num) => [var] -> LinEqs var num -> LinEqs var num
+groundVars vars ds = foldr groundVar ds vars
+
 groundAllVars :: (Ord var, Integral num) => LinEqs var num -> LinEqs var num
-groundAllVars ds = foldr groundVar ds { grounded = True } vars
+groundAllVars ds = (foldr groundVar ds vars) { grounded = True } 
     where vars = foldr merge [] $ map (\(LinExpr vs _) -> map fst vs) $ M.elems $ eqzero ds
           merge [] ys = ys
           merge xs [] = xs
@@ -137,7 +141,7 @@ getVar var ds = flip mplus (if grounded ds then Just 0 else Nothing) $ do
 evalLinExpr :: (Ord var, Integral num) => LinEqs var num -> LinExpr var num -> Either num (LinExpr var num)
 evalLinExpr = evalLinExprFrom Nothing
 
-evalLinExprFrom :: (Ord var, Integral num) => Maybe var => LinEqs var num -> LinExpr var num -> Either num (LinExpr var num)
+evalLinExprFrom :: (Ord var, Integral num) => Maybe var -> LinEqs var num -> LinExpr var num -> Either num (LinExpr var num)
 evalLinExprFrom _ _ (LinExpr [] n) = Left n
 evalLinExprFrom from ds@(LinEqs { eqzero = eqs }) e@(LinExpr vars _) = do
     fromMaybe (Right e) $ do
@@ -145,6 +149,22 @@ evalLinExprFrom from ds@(LinEqs { eqzero = eqs }) e@(LinExpr vars _) = do
         Just $ evalLinExprFrom (Just v) ds $ fromMaybe e $ do
             f@(LinExpr ((_,m):_) _) <- M.lookup v eqs `mplus` (if grounded ds then Just $ LinExpr [(v,1)] 0 else Nothing)
             Just $ if n `mod` m == 0 then e - fmap (* (n `div` m)) f else e
+
+
+groundExpr :: (Ord var, Integral num) => LinExpr var num -> LinEqs var num -> (num, LinEqs var num)
+groundExpr expr ds = case evalLinExpr ds expr of
+                          Left n -> (n, ds)
+                          Right (LinExpr [] n) -> (n, ds)
+                          Right expr'@(LinExpr [(v,m)] n) | n < 0 -> groundExpr expr' ds'
+                              where Just ds' = addEquation (LinExpr [(v, - signum m)] ((-n + abs m - 1) `div` abs m)) ds
+                          Right expr'@(LinExpr ((v,_):_) _) -> groundExpr expr' (groundVar v ds)
+
+
+linExprVariables :: LinExpr var num -> [var]
+linExprVariables (LinExpr pairs _) = map fst pairs
+
+linExprVariablesSet :: (Ord var) => LinExpr var num -> S.Set var
+linExprVariablesSet = S.fromAscList . linExprVariables
 
 
 instance (Serialize var, Serialize num) => Serialize (LinExpr var num) where

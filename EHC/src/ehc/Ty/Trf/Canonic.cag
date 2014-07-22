@@ -252,7 +252,7 @@ ATTR TyAGItf [ | | varMp: VarMp ]
 ATTR AllTy [ | varMp: VarMp | ]
 
 SEM TyAGItf
-  | AGItf           loc     .   varMp           =   emptyVarMp
+  | AGItf           ty      .   varMp           =   emptyVarMp
 %%]
 
 %%[(9 hmtyinfer)
@@ -383,7 +383,16 @@ SEM Ty
 
 %%[(9 hmtyinfer)
 ATTR AllTyAndFlds [ | | repl: SELF ]
-ATTR TyAGItf  [ | | repl: Ty ]
+ATTR TyAGItf  [ | | repl: Ty  self: SELF ]
+ATTR Ty  [ iconstr: {Maybe HsName} | | icount: Integer  irepl: Ty ]
+
+SEM TyAGItf
+  | AGItf           ty      .   iconstr         =   Nothing
+
+SEM Pred
+  | Class Pred Lacks    ty  .   iconstr         =   Nothing
+  | Eq                  tyL .   iconstr         =   Nothing
+                        tyR .   iconstr         =   Nothing
 %%]
 
 %%[(9 hmtyinfer)
@@ -406,8 +415,24 @@ extr o = (tbroutRes o, tbroutVarMp o)
 %%[(11 hmtyinfer)
 SEM Ty
   | App             (lhs.repl,loc.replVarMp)    :=  maybe (@replNoImplNil,emptyVarMp) extr @mbRepl
+                    (lhs.icount,lhs.irepl)      =   case (@lhs.iconstr, @func.repl) of
+                                                         (Just c, Ty_Con c') | c == c' -> (@arg.icount+1, @arg.irepl)
+                                                         _                             -> (0, @repl)
+  | * - App IterApp (lhs.icount,lhs.irepl)      =   (0, @repl)
   | Con             (lhs.repl,loc.replVarMp)    =   maybe (@repl,emptyVarMp) extr @mbRepl
 --  | Lam             (lhs.repl,loc.replVarMp)    =   maybe (@repl,emptyVarMp) extr @mbRepl
 %%]
 
 
+%%[1
+SEM Ty
+  | IterApp         arg.iconstr                 =   case @func.repl of
+                                                         Ty_Con c -> Just c
+                                                         _        -> Nothing
+                    (loc.itRes, loc.eqs)        =   groundExpr (@iter + fromIntegral @arg.icount) (vmEqs @arg.varMp)
+                    lhs.repl                    =   if @itRes >= 0
+                                                       then (!!fromIntegral @itRes) $ iterate (Ty_App @func.repl) @arg.irepl
+                                                       else error $ "Canon(IterApp): negative iteration\n"++show @arg.self++"\n"++show @arg.repl
+                    lhs.varMp                   =   @arg.varMp { vmEqs = @eqs }
+                    lhs.isReplaced              =   True
+%%]

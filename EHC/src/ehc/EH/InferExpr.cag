@@ -254,7 +254,7 @@ SEM Expr
                                                            Just n | n >= 0 -> (!!fromIntegral n) . iterate (acore1App $ acoreVar $ mkHNm "UHC.Base.Just")
                                                                   | otherwise -> error "Negative iteration"
                                                            Nothing -> id
-                lhs         .   tyVarMp             =   varmpEqMap (groundVar @ivar) $ @prvOccTlVarMp `varUpd` @arg.tyVarMp
+                lhs         .   tyVarMp             =   @prvOccTlVarMp `varUpd` @arg.tyVarMp
 %%]
 
 %%[(12 hmtyinfer).AppImpl

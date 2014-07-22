@@ -378,7 +378,8 @@ SEM Ty
                                                 else (@repl,emptyVarMp)
 
   | IterApp         lhs     .   repl        := case trm "sbs" (\e -> show @iter >#< " -> " >#< either pp (pp.show) e) $ evalLinExpr @lhs.iter @iter of
-                                                    Left i -> (!!fromIntegral i) $ iterate (Ty_App @func.repl) @arg.repl
+                                                    Left i | i >= 0 -> (!!fromIntegral i) $ iterate (Ty_App @func.repl) @arg.repl
+                                                           | otherwise -> error $ "Subst(IterArg): negative iteration\n"
                                                     Right e -> Ty_IterApp e @func.repl @arg.repl
 %%]
 
