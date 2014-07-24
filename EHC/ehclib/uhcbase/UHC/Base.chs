@@ -76,6 +76,7 @@ module UHC.Base   -- adapted from the Hugs prelude
     numerator, denominator,
     -- Maybe
     maybe, 
+    mbfmap, mbbind, mbflift,
     -- Either
     either,
  
@@ -782,6 +783,15 @@ instance Monad Maybe where
 maybe             :: b -> (a -> b) -> Maybe a -> b
 maybe n f Nothing  = n
 maybe n f (Just x) = f x
+
+mbfmap            :: (a -> b) -> Maybe a -> Maybe b
+mbfmap            = fmap
+
+mbbind            :: (a -> Maybe b) -> Maybe a -> Maybe b
+mbbind            = (=<<)
+
+mbflift           :: Maybe (a -> b) -> a -> Maybe b
+mbflift mf x      = mf >>= \f -> return (f x)
 
 --------------------------------------------------------------
 -- Either type

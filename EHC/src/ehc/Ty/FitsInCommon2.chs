@@ -128,9 +128,12 @@ fiLookupReplaceTyCyc :: VarLookup gm TyVarId VarMpInfo => FIIn' gm -> Ty -> Ty
 fiLookupReplaceTyCyc  fi t  =  maybe t (maybe t id . fiLookupTyVarCyc fi) $ tyMbVar t
 %%]
 
-%%[8 export(fiEvalExpr)
+%%[8 import(Control.Monad) export(fiEvalExpr, fiEqGetVar)
 fiEvalExpr :: EqsLookup gm TyVarId Integer => FIIn' gm -> LinExpr TyVarId Integer -> Either Integer (LinExpr TyVarId Integer)
 fiEvalExpr fi expr = (evalLinExpr $ getEqs $ fiVarMp fi) =<< (evalLinExpr $ getEqs $ fiVarMpLoc fi) expr
+
+fiEqGetVar :: EqsLookup gm TyVarId Integer => FIIn' gm -> TyVarId -> Maybe Integer
+fiEqGetVar fi var = (getVar var $ getEqs $ fiVarMp fi) `mplus` (getVar var $ getEqs $ fiVarMpLoc fi)
 %%]
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

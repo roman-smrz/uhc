@@ -1680,28 +1680,6 @@ GADT: when encountering a product with eq-constraints on the outset, remove them
                        isSum = hsnIsSum n1
                        fo = fRow fi tr1 tr2 isRec isSum
 
-{-
-            fBase fi updTy t1@(Ty_MbApp (Ty_Con n1) tr1)
-                           t2@(Ty_App (Ty_Con n2) tr2)
-                | n1 == n2 && (isRec || isSum)
-                = foUpdTy (updTy $ n1 `appConApp` [foTy fo]) fo
-                where  -- decompose
-                       -- the work
-                       isRec = hsnIsRec n1
-                       isSum = hsnIsSum n1
-                       fo = fRow fi tr1 tr2 isRec isSum
-
-            fBase fi updTy t1@(Ty_App (Ty_Con n1) tr1)
-                           t2@(Ty_MbApp (Ty_Con n2) tr2)
-                | n1 == n2 && (isRec || isSum)
-                = foUpdTy (updTy $ n1 `appConApp` [foTy fo]) fo
-                where  -- decompose
-                       -- the work
-                       isRec = hsnIsRec n1
-                       isSum = hsnIsSum n1
-                       fo = fRow fi tr1 tr2 isRec isSum
-		-}
-
 %%]
             fBase fi updTy t1@(Ty_App ta1 tr1)
                            t2@(Ty_App ta2 tr2)
@@ -1820,6 +1798,11 @@ GADT: when encountering a product with eq-constraints on the outset, remove them
             fBase fi updTy t1 (Ty_IterApp expr tf t2@(Ty_Var _ TyVarCateg_Plain))
                 = fVar' fBase fi updTy (Ty_IterApp (-expr) tf t1) t2
 
+            fBase fi updTy t1@(Ty_IterApp {}) (Ty_ForcedApp ivar False (Ty_Con _) t2) =
+                fVar' fBase (fi { fiVarMpLoc = mapEqs (addNonnegative (LinExpr [(ivar,1::Integer)] 0)) (fiVarMpLoc fi) }) updTy t1 t2
+            fBase fi updTy (Ty_ForcedApp ivar False (Ty_Con _) t1) t2@(Ty_IterApp {}) =
+                fVar' fBase (fi { fiVarMpLoc = mapEqs (addNonnegative (LinExpr [(ivar,1::Integer)] 0)) (fiVarMpLoc fi) }) updTy t1 t2
+
             fBase fi updTy t1@(Ty_IterApp expr tf1 ta1) t2
                 = case trm "fi1" ((\p -> p >#< t1 >#< t2) . (either pp $ pp.show)) $ fiEvalExpr fi expr of
                        Left i | i >= 0 -> fVar' fBase fi updTy (iterate (Ty_App tf1) ta1 !! fromIntegral i) t2
@@ -1833,52 +1816,34 @@ GADT: when encountering a product with eq-constraints on the outset, remove them
                               | otherwise -> fVar' fBase fi updTy (iterate (Ty_App tf2) t1 !! fromIntegral (-i)) ta2
                        Right e -> case addEquation e (getEqs $ fiVarMpLoc fi) of
                                        Just eqs -> fVar' fBase (fi { fiVarMpLoc = mapEqs (const eqs) (fiVarMpLoc fi) }) updTy t1 ta2
-{-
-	    fBase fi updTy (Ty_MbApp tv use tf1 ta1) t2
-		| Just (Ty_MbApp _ use' _ _) <- fiLookupTyVarCyc fi tv
-		= if use' == use then fVar' fBase fi updTy (Ty_App tf1 ta1) t2
-                                 else fVar' fBase fi updTy ta1 t2
 
-	    fBase fi updTy t1 (Ty_MbApp tv use tf2 ta2)
-		| Just (Ty_MbApp _ use' _ _) <- fiLookupTyVarCyc fi tv
-		= if use' == use then fVar' fBase fi updTy t1 (Ty_App tf2 ta2)
-                                 else fVar' fBase fi updTy t1 ta2
+            fBase fi updTy (Ty_ForcedApp ivar True tf t1) t2 = fBase fi updTy t1 (Ty_ForcedApp ivar False tf t2)
+            fBase fi updTy t1 (Ty_ForcedApp ivar True tf t2) = fBase fi updTy (Ty_ForcedApp ivar False tf t1) t2
 
-            fBase fi updTy t1@(Ty_MbApp tv use tc@(Ty_Con c1) ta1)
-                           t2@(Ty_App (Ty_Con c2) ta2)
-		| c1 == c2  = let fo = fVar' fBase fi updTy ta1 (Ty_MbApp tv (not use) tc ta2)
-                               in foUpdTy (Ty_MbApp tv use tc $ foTy fo) fo
-		| otherwise = foUpdVarMp (tv `varmpTyUnit` Ty_MbApp tv (not use) tc Ty_Any) $
-                           fVar' fBase (fi { fiVarMp = tv `varmpTyUnit` (Ty_MbApp tv (not use) tc Ty_Any) |+> fiVarMp fi }) updTy ta1 t2
+            fBase fi updTy (Ty_ForcedApp ivar False tf t1) t2
+                | Just n <- fiEqGetVar fi ivar = if n >= 0 then fVar' fBase fi updTy t1 t2
+                                                           else fVar' fBase fi updTy (Ty_App tf t1) t2
 
-            fBase fi updTy t1@(Ty_App (Ty_Con c1) ta1)
-                           t2@(Ty_MbApp tv use tc@(Ty_Con c2) ta2)
-		| c1 == c2  = let fo = fVar' fBase fi updTy (Ty_MbApp tv (not use) tc ta1) ta2
-                               in foUpdTy (Ty_MbApp tv use tc $ foTy fo) fo
-		| otherwise = foUpdVarMp (tv `varmpTyUnit` Ty_MbApp tv (not use) tc Ty_Any) $
-                           fVar' fBase (fi { fiVarMp = tv `varmpTyUnit` (Ty_MbApp tv (not use) tc Ty_Any) |+> fiVarMp fi }) updTy t1 ta2
+            fBase fi updTy t1 (Ty_ForcedApp ivar False tf t2)
+                | Just n <- fiEqGetVar fi ivar = if n >= 0 then fVar' fBase fi updTy t1 t2
+                                                           else fVar' fBase fi updTy t1 (Ty_App tf t2)
 
-            fBase fi updTy t1@(Ty_MbApp tv use tc ta1)
-                           t2@(Ty_Con _)
-		= foUpdVarMp (tv `varmpTyUnit` Ty_MbApp tv (not use) tc Ty_Any) $ 
-                    fVar' fBase (fi { fiVarMp = tv `varmpTyUnit` (Ty_MbApp tv (not use) tc Ty_Any) |+> fiVarMp fi }) updTy ta1 t2
+            fBase fi updTy (Ty_ForcedApp ivar False (Ty_Con c1) t1@(Ty_App (Ty_Con c1') _)) t2
+                | c1 == c1' = fVar' fBase fi updTy t1 t2
+            fBase fi updTy t1 (Ty_ForcedApp ivar False (Ty_Con c2) t2@(Ty_App (Ty_Con c2') _))
+                | c2 == c2' = fVar' fBase fi updTy t1 t2
 
-	    fBase fi updTy t1@(Ty_Con _)
-	                   t2@(Ty_MbApp tv use tc ta2)
-		= foUpdVarMp (tv `varmpTyUnit` Ty_MbApp tv (not use) tc Ty_Any) $ 
-                    fVar' fBase (fi { fiVarMp = tv `varmpTyUnit` (Ty_MbApp tv (not use) tc Ty_Any) |+> fiVarMp fi }) updTy t1 ta2
+            fBase fi updTy (Ty_ForcedApp ivar False (Ty_Con c1) t1) t2@(Ty_App (Ty_Con c2) _)
+                | c1 == c2  = fVar' fBase fi updTy t1 t2
+                | otherwise = fVar' fBase (fi { fiVarMpLoc = mapEqs (addNonnegative (LinExpr [(ivar,1::Integer)] 0)) (fiVarMpLoc fi) }) updTy t1 t2
+            fBase fi updTy t1@(Ty_App (Ty_Con c1) _) (Ty_ForcedApp ivar False (Ty_Con c2) t2)
+                | c1 == c2  = fVar' fBase fi updTy t1 t2
+                | otherwise = fVar' fBase (fi { fiVarMpLoc = mapEqs (addNonnegative (LinExpr [(ivar,1::Integer)] 0)) (fiVarMpLoc fi) }) updTy t1 t2
 
-            -- TODO
-            {-
-            fBase fi updTy t1@(Ty_MbApp tv1 use1 tc1 ta1)
-                           t2@(Ty_MbApp tv2 use2 tc2 ta2)
-                = foUpdVarMp (tv1 `varmpTyUnit` Ty_MbApp tv1 (not use1) tc1 Ty_Any) $
-                    foUpdVarMp (tv2 `varmpTyUnit` Ty_MbApp tv2 (not use2) tc2 Ty_Any) $
-                        fVar' fBase (
-                            fi { fiVarMp = tv1 `varmpTyUnit` (Ty_MbApp tv1 (not use1) tc1 Ty_Any) |+> tv2 `varmpTyUnit` (Ty_MbApp tv2 (not use2) tc2 Ty_Any) |+> fiVarMp fi }
-                            ) updTy ta1 ta2
-            -}
--}
+            fBase fi updTy (Ty_ForcedApp ivar False (Ty_Con _) t1) t2 =
+                fVar' fBase (fi { fiVarMpLoc = mapEqs (addNonnegative (LinExpr [(ivar,1::Integer)] 0)) (fiVarMpLoc fi) }) updTy t1 t2
+            fBase fi updTy t1 (Ty_ForcedApp ivar False (Ty_Con _) t2) =
+                fVar' fBase (fi { fiVarMpLoc = mapEqs (addNonnegative (LinExpr [(ivar,1::Integer)] 0)) (fiVarMpLoc fi) }) updTy t1 t2
 %%]
 
 

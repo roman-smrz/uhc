@@ -110,20 +110,23 @@ zipVars f ((v,n):xs) ((w,m):ys) | v < w = (v,n) : zipVars f xs ((w,m):ys)
                                                             nm -> (v, nm) : zipVars f xs ys
 
 
-addNonnegative :: LinExpr var num -> LinEqs var num -> Maybe (LinEqs var num)
-addNonnegative expr ds = Just $ ds { geqzero = expr : geqzero ds }
+addNonnegative :: LinExpr var num -> LinEqs var num -> LinEqs var num
+addNonnegative expr ds = ds { geqzero = expr : geqzero ds }
 
-groundVar :: (Ord var, Integral num) => var -> LinEqs var num -> LinEqs var num
+groundVar :: (Ord var, Integral num) => var -> LinEqs var num -> (num, LinEqs var num)
 groundVar v ds = case getVar v ds of
-                      Just _  -> ds
+                      Just n  -> (n, ds)
                       Nothing -> let Just ds' = addEquation (LinExpr [(v, 1)] 0) ds
-                                  in ds'
+                                  in (0, ds')
+
+groundVar' :: (Ord var, Integral num) => var -> LinEqs var num -> LinEqs var num
+groundVar' v ds = snd $ groundVar v ds
 
 groundVars :: (Ord var, Integral num) => [var] -> LinEqs var num -> LinEqs var num
-groundVars vars ds = foldr groundVar ds vars
+groundVars vars ds = foldr groundVar' ds vars
 
 groundAllVars :: (Ord var, Integral num) => LinEqs var num -> LinEqs var num
-groundAllVars ds = (foldr groundVar ds vars) { grounded = True } 
+groundAllVars ds = (foldr groundVar' ds vars) { grounded = True }
     where vars = foldr merge [] $ map (\(LinExpr vs _) -> map fst vs) $ M.elems $ eqzero ds
           merge [] ys = ys
           merge xs [] = xs
@@ -157,7 +160,7 @@ groundExpr expr ds = case evalLinExpr ds expr of
                           Right (LinExpr [] n) -> (n, ds)
                           Right expr'@(LinExpr [(v,m)] n) | n < 0 -> groundExpr expr' ds'
                               where Just ds' = addEquation (LinExpr [(v, - signum m)] ((-n + abs m - 1) `div` abs m)) ds
-                          Right expr'@(LinExpr ((v,_):_) _) -> groundExpr expr' (groundVar v ds)
+                          Right expr'@(LinExpr ((v,_):_) _) -> groundExpr expr' (groundVar' v ds)
 
 
 linExprVariables :: LinExpr var num -> [var]

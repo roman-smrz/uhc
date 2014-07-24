@@ -18,25 +18,27 @@ ATTR Ty [ | | appFunNm: HsName ]
 %%[(1 hmtyinfer || hmtyast).ConNm.ConApp
 SEM Ty
   | Con         lhs         .   appFunNm        =   @nm
-  | App IterApp loc         .   appFunNm        =   @func.appFunNm
+  | App IterApp ForcedApp
+                loc         .   appFunNm        =   @func.appFunNm
 %%]
 
 %%[(1 hmtyinfer || hmtyast).ConNm.Ty
 SEM Ty
-  | * - Con App IterApp
+  | * - Con App IterApp ForcedApp
                 lhs         .   appFunNm        =   hsnUnknown
 %%]
 
 %%[(7 hmtyinfer || hmtyast) -1.ConNm.Ty
 SEM Ty
   | Ext         loc         .   appFunNm        =   @ty.appFunNm
-  | * - Con App IterApp Ext
+  | * - Con App IterApp ForcedApp Ext
                 lhs         .   appFunNm        =   hsnUnknown
 %%]
 
 %%[(9 hmtyinfer || hmtyast)
 SEM Ty
-  | Ext App IterApp loc     .   appFunNm        :   {HsName}
+  | Ext App IterApp ForcedApp
+                loc         .   appFunNm        :   {HsName}
 %%]
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -45,14 +47,16 @@ SEM Ty
 
 %%[(4 hmtyinfer || hmtyast)
 SEM Ty
-  | App IterApp   loc       .   appIsArrow      =   hsnIsArrow @func.appFunNm
+  | App IterApp ForcedApp
+                loc         .   appIsArrow      =   hsnIsArrow @func.appFunNm
                             .   appIsLikeProd   =   hsnIsProd @func.appFunNm
                             .   appIsOther      =   not (@appIsArrow || @appIsLikeProd)
 %%]
 
 %%[(7 hmtyinfer || hmtyast)
 SEM Ty
-  | App IterApp   loc       .   appIsRec        =   hsnIsRec @func.appFunNm
+  | App IterApp ForcedApp
+                loc         .   appIsRec        =   hsnIsRec @func.appFunNm
                             .   appIsSum        =   hsnIsSum @func.appFunNm
                             .   appIsRecOrSum   =   @appIsRec || @appIsSum
                             .   appIsLikeProd   :=  hsnIsProd @func.appFunNm || @appIsRec
@@ -60,7 +64,8 @@ SEM Ty
 
 %%[(9 hmtyinfer || hmtyast)
 SEM Ty
-  | App IterApp loc         .   appIsLikeProd   :   Bool
+  | App IterApp ForcedApp
+                loc         .   appIsLikeProd   :   Bool
                 loc         .   appIsArrow      :   Bool
                 loc         .   appIsRec        :   Bool
 %%]
@@ -90,9 +95,11 @@ SEM TyAGItf
   | AGItf       ty          .   isRow           =   False
 
 SEM Ty
-  | App IterApp loc         .   argIsRow        =   @isSpineRoot && @appIsRecOrSum
+  | App IterApp ForcedApp
+                loc         .   argIsRow        =   @isSpineRoot && @appIsRecOrSum
                 arg         .   isRow           =   @argIsRow
-  | * - App IterApp loc     .   isRow           =   False
+  | * - App IterApp ForcedApp
+                loc         .   isRow           =   False
 %%]
 
 %%[(7_1 hmtyinfer || hmtyast)
@@ -102,7 +109,8 @@ SEM TyL
 
 %%[(9 hmtyinfer || hmtyast)
 SEM Ty
-  | App IterApp   loc       .   argIsRow   		:   Bool
+  | App IterApp ForcedApp
+                loc         .   argIsRow   		:   Bool
 %%]
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -121,7 +129,8 @@ SEM TyAGItf
   | AGItf       ty          .   appSpinePos     =   0
 
 SEM Ty
-  | App IterApp func        .   appSpinePos     =   @lhs.appSpinePos + 1
+  | App IterApp ForcedApp
+                func        .   appSpinePos     =   @lhs.appSpinePos + 1
                 arg         .   appSpinePos     =   0
 %%]
 
@@ -156,7 +165,7 @@ data TyQuCtxt = TyQuCtxtArrow | TyQuCtxtProd | TyQuCtxtOnTop | TyQuCtxtOther der
 
 %%[(1 hmtyinfer || hmtyast)
 SEM Ty
-  | App IterApp
+  | App IterApp ForcedApp
 %%[[7
     Ext
 %%]]
@@ -170,7 +179,8 @@ SEM PredSeq
 
 %%[(4 hmtyinfer || hmtyast)
 SEM Ty
-  | App IterApp loc         .   isArrowRoot     =   @appIsArrow && @isSpineRoot
+  | App IterApp ForcedApp
+                loc         .   isArrowRoot     =   @appIsArrow && @isSpineRoot
                             .   isArrowArg      =   @appIsArrow && @lhs.appSpinePos == 1
                             .   isProdRoot      =   @appIsLikeProd && @isSpineRoot
 %%]
@@ -179,18 +189,22 @@ SEM Ty
 ATTR Ty [ | | isArrow: Bool ]
 
 SEM Ty
-  | App IterApp     lhs     .   isArrow         =   @isArrowRoot
-  | * - App IterApp lhs     .   isArrow         =   False
+  | App IterApp ForcedApp
+                lhs         .   isArrow         =   @isArrowRoot
+  | * - App IterApp ForcedApp
+                lhs         .   isArrow         =   False
 %%]
 
 %%[(4 hmtyinfer || hmtyast)
 ATTR AllTy [ tyCtxt: TyQuCtxt | | ]
 
 SEM Ty
-  | App IterApp loc         .   tyCtxt          =   if      @appIsArrow     then TyQuCtxtArrow
+  | App IterApp ForcedApp
+                loc         .   tyCtxt          =   if      @appIsArrow     then TyQuCtxtArrow
                                                     else if @appIsLikeProd  then TyQuCtxtProd
                                                                             else TyQuCtxtOther
-  | * - App IterApp loc     .   tyCtxt          =   TyQuCtxtOther
+  | * - App IterApp ForcedApp
+                loc         .   tyCtxt          =   TyQuCtxtOther
 
 SEM TyAGItf
   | AGItf       ty          .   tyCtxt          =   TyQuCtxtOnTop
@@ -201,14 +215,16 @@ ATTR Ty [ | | isPred: Bool ]
 
 SEM Ty
   | Pred Impls  lhs         .   isPred          =   True
-  | App IterApp lhs         .   isPred          =   if @isArrowArg then @arg.isPred else False
-  | * - Pred Impls App IterApp
+  | App IterApp ForcedApp
+                lhs         .   isPred          =   if @isArrowArg then @arg.isPred else False
+  | * - Pred Impls App IterApp ForcedApp
                 lhs         .   isPred          =   False
 %%]
 
 %%[(9 hmtyinfer || hmtyast)
 SEM Ty
-  | App IterApp loc         .   isArrowArg      :   Bool
+  | App IterApp ForcedApp
+                loc         .   isArrowArg      :   Bool
                 loc         .   isSpineRoot     :   Bool
                 loc         .   isArrowRoot     :   Bool
 %%]

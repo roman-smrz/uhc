@@ -364,6 +364,10 @@ DATA Ty
   | IterApp     iter            : {LinExpr TyVarId Integer}
                 func            : Ty
                 arg             : Ty
+  | ForcedApp   ivar            : {TyVarId}
+                inverse         : Bool
+                func            : Ty
+                arg             : Ty
 %%]
 
 

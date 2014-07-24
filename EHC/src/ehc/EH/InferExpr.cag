@@ -247,14 +247,29 @@ SEM Expr
                                                                lcon = if ehcOptAutolift @lhs.opts
                                                                          then Ty_IterApp (LinExpr [(ivar,1)] 0) (Ty_Con (mkHNm "UHC.Base.Maybe"))
                                                                          else id
-                                                            in ([im,lcon at] `appArr` @lhs.knTy,im,at,ivar)
+                                                               knTy' = if ehcOptAutolift @lhs.opts && a /= mkUID [3,218,2]
+                                                                          then Ty_ForcedApp ivar True (Ty_Con (mkHNm "UHC.Base.Maybe")) @lhs.knTy
+                                                                          else @lhs.knTy
+                                                            in ([im,lcon at] `appArr` knTy',im,at,ivar)
                 loc         .   ty_                 :=  @lhs.knTy
                 loc         .   (prOccL,implsTl)    =   implsPredsTailWithLkup (varmpImplsLookupCyc2 @arg.tyVarMp) @lhs.predScope $ tyImplsWithLkup (varmpTyLookupCyc2 @arg.tyVarMp) @imTy
-                loc         .   mbAppCorArg         = case getVar @ivar $ vmEqs @lhs.finTyVarMp of
-                                                           Just n | n >= 0 -> (!!fromIntegral n) . iterate (acore1App $ acoreVar $ mkHNm "UHC.Base.Just")
-                                                                  | otherwise -> error "Negative iteration"
-                                                           Nothing -> id
+                loc         .   (alAppCorArg, alAppCorFunc)
+                                                    =   case getVar @ivar $ vmEqs @lhs.finTyVarMp of
+                                                             Just n | n >= 0    -> ((!!fromIntegral n) . iterate (acore1App $ acoreVar $ mkHNm "UHC.Base.Just"), id)
+                                                                    | otherwise -> (id,
+                                                                        (!!fromIntegral (-n-1)) . iterate (acore1App $ acoreVar $ mkHNm "UHC.Base.mbbind") .
+                                                                            (acore1App $ acoreVar $ mkHNm
+                                                                                (if tyFuncEndsWith (mkHNm "UHC.Base.Maybe") (@lhs.finTyVarMp `varUpd` @knFunTy)
+                                                                                    then "UHC.Base.mbbind" else "UHC.Base.mbfmap")))
+                                                             Nothing -> (id, id)
                 lhs         .   tyVarMp             =   @prvOccTlVarMp `varUpd` @arg.tyVarMp
+%%]
+
+%%[(9 hmtyinfer).App hs
+tyFuncEndsWith :: HsName -> Ty -> Bool
+tyFuncEndsWith name ty = case appUnArrRes ty of
+                              Ty_App (Ty_Con c) _ -> c == name
+                              _                   -> False
 %%]
 
 %%[(12 hmtyinfer).AppImpl
@@ -272,7 +287,8 @@ SEM Expr
                             .   iterLinEqs          =   foLinEqs @foPr
                 loc         .   ty                  =   @knResImpls `appArr` @ty_
                 loc         .   lUniq               :   UNIQUEREF gUniq
-                loc         .   mbAppCorArg         =   id
+                loc         .   alAppCorArg         =   id
+                loc         .   alAppCorFunc        =   id
 %%]
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -454,7 +454,8 @@ ATTR
 %%[(1 hmtyinfer || hmtyast)
 SEM Ty
   | Con             loc     .   pp      =   ppCon @nm
-  | App IterApp     loc     .   ppDflt  =   @func.pp >#< @arg.pp
+  | App IterApp ForcedApp
+                    loc     .   ppDflt  =   @func.pp >#< @arg.pp
                             .   ppAppTop=   ppAppTop (@appFunNm,@appFunPP) @appArgPPL @ppDflt
                             .   ppNice  =   ppParNeed  @parNeed @lhs.parNeed @ppAppTop
                             .   pp      =   if @isSpineRoot then @ppNice else @ppDflt
@@ -466,7 +467,8 @@ SEM Ty
 %%[(8 hmtyinfer || hmtyast)
 SEM Ty
   | Con             loc     .   pp      :=  cfgPPTyPPCon @lhs.cfg @lhs.cfg @nm
-  | App IterApp     loc     .   ppDflt  :=  if cfgPPTyFollowAST @lhs.cfg then ppParens @func.pp >#< ppParens @arg.pp else @func.pp >#< @arg.pp
+  | App IterApp ForcedApp
+                    loc     .   ppDflt  :=  if cfgPPTyFollowAST @lhs.cfg then ppParens @func.pp >#< ppParens @arg.pp else @func.pp >#< @arg.pp
                             .   ppAST   :=  hv ([ppParens @appFunPP] ++ map ((" " >|<) . ppParens) @appArgPPL)
                             .   pp      :=  if @isSpineRoot
                                             then if cfgPPTyFollowAST @lhs.cfg
@@ -474,13 +476,14 @@ SEM Ty
                                                  else @ppNice
                                             else @ppDflt
   | IterApp         loc     .   ppDflt  :=  if cfgPPTyFollowAST @lhs.cfg then ppParens @func.pp >#< "*[" >#< show @iter >#< "]" >#< ppParens @arg.pp else @func.pp >#< "*[" >#< show @iter >#< "]" >#< @arg.pp
+  | ForcedApp       loc     .   ppDflt  :=  if cfgPPTyFollowAST @lhs.cfg then ppParens @func.pp >#< (if @inverse then "!-[" else "!+[") >#< show @ivar >#< "]" >#< ppParens @arg.pp else @func.pp >#< (if @inverse then "f[" else "F[") >#< show @ivar >#< "]" >#< @arg.pp
 
   -- | MbApp           loc     .   ppDflt  := @func.pp >#< ("?"++(if @use then "" else "!") -}++"(") >#< show @tv >#< ")" >#< @arg.pp
 %%]
 
 %%[(99 hmtyinfer || hmtyast)
 SEM Ty
-  | App IterApp     loc     .   ppAppTop:=  ppAppTop' (@appFunNm,@appFunPP) @appArgPPL @appArgIsEmptyImplsL @ppDflt
+  | App IterApp ForcedApp   loc     .   ppAppTop:=  ppAppTop' (@appFunNm,@appFunPP) @appArgPPL @appArgIsEmptyImplsL @ppDflt
 %%]
 
 %%[(2 hmtyinfer || hmtyast).Var
@@ -707,9 +710,9 @@ SEM Pred
 %%[(7 hmtyinfer || hmtyast)
 SEM Ty
 %%[[7
-  | App IterApp     loc     .  recSep       =   "|"
+  | App IterApp ForcedApp   loc     .  recSep       =   "|"
 %%][99
-  | App IterApp     loc     .  recSep       =   cfgPPTyLhsSafe @lhs.cfg "|"
+  | App IterApp ForcedApp   loc     .  recSep       =   cfgPPTyLhsSafe @lhs.cfg "|"
 %%]]
 %%]
 
@@ -731,28 +734,33 @@ ATTR
 
 %%[(1 hmtyinfer || hmtyast).appFunPP.Ty
 SEM Ty
-  | App IterApp     loc     .  appArgPPL    =   @func.appArgPPL ++ [@arg.pp]
+  | App IterApp ForcedApp
+                    loc     .  appArgPPL    =   @func.appArgPPL ++ [@arg.pp]
                             .  appFunPP     =   @func.appFunPP
-  | * - App IterApp lhs     .  appArgPPL    =   []
+  | * - App IterApp ForcedApp
+                    lhs     .  appArgPPL    =   []
                             .  appFunPP     =   @pp
 %%]
 
 %%[(7 hmtyinfer || hmtyast) -1.appFunPP.Ty
 SEM Ty
-  | App IterApp     loc     .  (appFunPP,appArgPPL)
+  | App IterApp ForcedApp
+                    loc     .  (appFunPP,appArgPPL)
                                             :=  mkExtAppPP' @recSep
                                                             (@appFunNm,@func.appFunPP,@func.appArgPPL)
                                                             (@arg.appFunNm,@arg.appFunPP,@arg.appArgPPL,@arg.pp)
   | Ext             loc     .  fldPP        =   ppFld "::" (Just @positionalNm) @nm (pp @nm) @extTy.pp
                             .  appArgPPL    :=  @ty.appArgPPL ++ [@fldPP]
                             .  appFunPP     :=  @ty.appFunPP
-  | * - App Ext IterApp lhs .  appArgPPL    :=  []
+  | * - App Ext IterApp ForcedApp
+                    lhs     .  appArgPPL    :=  []
                             .  appFunPP     :=  @pp
 %%]
 
 %%[(8 hmtyinfer || hmtyast)
 SEM Ty
-  | App IterApp     loc     .  (appFunPP,appArgPPL)
+  | App IterApp ForcedApp
+                    loc     .  (appFunPP,appArgPPL)
                                             :=  if cfgPPTyFollowAST @lhs.cfg
                                                 then (@func.appFunPP,@func.appArgPPL ++ [@arg.pp])
                                                 else mkExtAppPP' @recSep
@@ -780,7 +788,8 @@ SEM TyAGItf
                         .   parNeedL            =   []
 
 SEM Ty
-  | App IterApp loc     .   (parNeed,argsParNeedL)
+  | App IterApp ForcedApp
+                loc     .   (parNeed,argsParNeedL)
                                                 =   if @isSpineRoot
                                                     then  parNeedApp @appFunNm
                                                     else  (ParNotNeeded,@lhs.parNeedL)
@@ -853,7 +862,7 @@ SEM Ty
 ATTR Ty [ | | appArgIsEmptyImplsL: {[Bool]} ]
 
 SEM Ty
-  | App IterApp     loc     .   appArgIsEmptyImplsL     =   @func.appArgIsEmptyImplsL ++ [@arg.isEmptyImpls]
-  | * - App IterApp lhs     .   appArgIsEmptyImplsL     =   []
+  | App IterApp ForcedApp       loc     .   appArgIsEmptyImplsL     =   @func.appArgIsEmptyImplsL ++ [@arg.isEmptyImpls]
+  | * - App IterApp ForcedApp   lhs     .   appArgIsEmptyImplsL     =   []
 %%]
 

@@ -37,7 +37,7 @@ Substitution over a meta level higher is the same as over the current level, exc
 %%[(6 hmtyinfer || hmtyast) hs import({%{EH}Base.Debug},UHC.Util.Pretty,{%{EH}Ty.Pretty})
 %%]
 
-%%[(1 hmtyinfer) hs import({%{EH}LinEqs})
+%%[(1 hmtyinfer) hs import({%{EH}LinEqs},{%{EH}Base.TermLike})
 %%]
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -377,10 +377,16 @@ SEM Ty
                                                 then tvRepl3 @tv @tvUse varmpTyUnit @repl @replv @repl'.repl @repl'.cycVarMp
                                                 else (@repl,emptyVarMp)
 
-  | IterApp         lhs     .   repl        := case trm "sbs" (\e -> show @iter >#< " -> " >#< either pp (pp.show) e) $ evalLinExpr @lhs.iter @iter of
+  | IterApp         lhs     .   repl        := case evalLinExpr @lhs.iter @iter of
                                                     Left i | i >= 0 -> (!!fromIntegral i) $ iterate (Ty_App @func.repl) @arg.repl
-                                                           | otherwise -> error $ "Subst(IterArg): negative iteration\n"
+                                                           | otherwise -> (!!fromIntegral (-i)) $ iterate (snd . appUn1Arr) @arg.repl
                                                     Right e -> Ty_IterApp e @func.repl @arg.repl
+
+  | ForcedApp       lhs     .   repl        := case getVar @ivar @lhs.iter of
+                                                    Just n | n >= 0     -> @arg.repl
+                                                           | @inverse   -> snd $ appUn1Arr @arg.repl
+                                                           | otherwise  -> Ty_App @func.repl @arg.repl
+                                                    Nothing             -> Ty_ForcedApp @ivar @inverse @func.repl @arg.repl
 %%]
 
 %%[(6 hmtyinfer || hmtyast)

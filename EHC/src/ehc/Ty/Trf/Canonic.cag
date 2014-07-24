@@ -418,7 +418,8 @@ SEM Ty
                     (lhs.icount,lhs.irepl)      =   case (@lhs.iconstr, @func.repl) of
                                                          (Just c, Ty_Con c') | c == c' -> (@arg.icount+1, @arg.irepl)
                                                          _                             -> (0, @repl)
-  | * - App IterApp (lhs.icount,lhs.irepl)      =   (0, @repl)
+  | * - App IterApp ForcedApp
+                    (lhs.icount,lhs.irepl)      =   (0, @repl)
   | Con             (lhs.repl,loc.replVarMp)    =   maybe (@repl,emptyVarMp) extr @mbRepl
 --  | Lam             (lhs.repl,loc.replVarMp)    =   maybe (@repl,emptyVarMp) extr @mbRepl
 %%]
@@ -433,6 +434,22 @@ SEM Ty
                     lhs.repl                    =   if @itRes >= 0
                                                        then (!!fromIntegral @itRes) $ iterate (Ty_App @func.repl) @arg.irepl
                                                        else error $ "Canon(IterApp): negative iteration\n"++show @arg.self++"\n"++show @arg.repl
+                    lhs.varMp                   =   @arg.varMp { vmEqs = @eqs }
+                    lhs.isReplaced              =   True
+                    (lhs.icount,lhs.irepl)      =   case (@lhs.iconstr, @func.repl) of
+                                                         (Just c, Ty_Con c') | c == c' -> (@itRes, @arg.irepl)
+                                                         _                             -> (0, @repl)
+
+  | ForcedApp       (loc.itRes, loc.eqs)        =   groundVar @ivar (vmEqs @arg.varMp)
+                    (lhs.repl,(lhs.icount,lhs.irepl))
+                                                =   if @itRes >= 0
+                                                       then (@arg.repl, (@arg.icount, @arg.irepl))
+                                                       else if @inverse then error $ "Canon(ForcedApp): remove application"
+                                                               else (,) (Ty_App @func.repl @arg.repl) $
+                                                                   case (@lhs.iconstr, @func.repl) of
+                                                                        (Just c, Ty_Con c') | c == c' -> (@arg.icount+1, @arg.irepl)
+                                                                        _                             -> (0, @repl)
+                                                                        
                     lhs.varMp                   =   @arg.varMp { vmEqs = @eqs }
                     lhs.isReplaced              =   True
 %%]

@@ -188,7 +188,7 @@ SEM Expr
 %%][9
                 loc         .   (cexprapp,cexprappCSubst)
 %%]]
-                                            =   let mkapp f = wr $ acore1App f (@mbAppCorArg @arg.cexpr)
+                                            =   let mkapp f = wr $ acore1App (@alAppCorFunc f) (@alAppCorArg @arg.cexpr)
 %%[[(8 coresysf)
                                                     wr      = @sysfcTyArgLamWrap . @sysfcTyArgAppWrap
 %%][8
