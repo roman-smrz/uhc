@@ -379,14 +379,26 @@ SEM Ty
 
   | IterApp         lhs     .   repl        := case evalLinExpr @lhs.iter @iter of
                                                     Left i | i >= 0 -> (!!fromIntegral i) $ iterate (Ty_App @func.repl) @arg.repl
-                                                           | otherwise -> (!!fromIntegral (-i)) $ iterate (snd . appUn1Arr) @arg.repl
+                                                           | otherwise -> maybe (error "Subst(IterApp): negative iteration without corresponding application") id $ tyRemFromRes (fromIntegral (-i)) @func.repl @arg.repl
                                                     Right e -> Ty_IterApp e @func.repl @arg.repl
 
   | ForcedApp       lhs     .   repl        := case getVar @ivar @lhs.iter of
                                                     Just n | n >= 0     -> @arg.repl
-                                                           | @inverse   -> snd $ appUn1Arr @arg.repl
+                                                           | @inverse   -> maybe (error "Subst(ForcedApp): remove without corresponding application") id $ tyRemFromRes 1 @func.repl @arg.repl
                                                            | otherwise  -> Ty_App @func.repl @arg.repl
                                                     Nothing             -> Ty_ForcedApp @ivar @inverse @func.repl @arg.repl
+%%]
+
+%%[(4 hmtyinfer || hmtyast) hs
+tyRemoveApp :: Int -> Ty -> Ty -> Maybe Ty
+tyRemoveApp 0 _ ty = Just ty
+tyRemoveApp n tr@(Ty_Con c) (Ty_App (Ty_Con c') t) | c == c' = tyRemoveApp (n-1) tr t
+tyRemoveApp _ _ _ = Nothing
+
+tyRemFromRes :: Int -> Ty -> Ty -> Maybe Ty
+tyRemFromRes n tr ty = do let (params, res) = appUnArr ty
+                          res' <- tyRemoveApp n tr res
+                          return $ params `appArr` res'
 %%]
 
 %%[(6 hmtyinfer || hmtyast)

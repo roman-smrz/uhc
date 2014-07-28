@@ -247,21 +247,33 @@ SEM Expr
                                                                lcon = if ehcOptAutolift @lhs.opts
                                                                          then Ty_IterApp (LinExpr [(ivar,1)] 0) (Ty_Con (mkHNm "UHC.Base.Maybe"))
                                                                          else id
-                                                               knTy' = if ehcOptAutolift @lhs.opts && a /= mkUID [3,218,2]
+                                                               knTy' = if ehcOptAutolift @lhs.opts
                                                                           then Ty_ForcedApp ivar True (Ty_Con (mkHNm "UHC.Base.Maybe")) @lhs.knTy
                                                                           else @lhs.knTy
                                                             in ([im,lcon at] `appArr` knTy',im,at,ivar)
                 loc         .   ty_                 :=  @lhs.knTy
                 loc         .   (prOccL,implsTl)    =   implsPredsTailWithLkup (varmpImplsLookupCyc2 @arg.tyVarMp) @lhs.predScope $ tyImplsWithLkup (varmpTyLookupCyc2 @arg.tyVarMp) @imTy
-                loc         .   (alAppCorArg, alAppCorFunc)
-                                                    =   case getVar @ivar $ vmEqs @lhs.finTyVarMp of
-                                                             Just n | n >= 0    -> ((!!fromIntegral n) . iterate (acore1App $ acoreVar $ mkHNm "UHC.Base.Just"), id)
-                                                                    | otherwise -> (id,
-                                                                        (!!fromIntegral (-n-1)) . iterate (acore1App $ acoreVar $ mkHNm "UHC.Base.mbbind") .
-                                                                            (acore1App $ acoreVar $ mkHNm
-                                                                                (if tyFuncEndsWith (mkHNm "UHC.Base.Maybe") (@lhs.finTyVarMp `varUpd` @knFunTy)
-                                                                                    then "UHC.Base.mbbind" else "UHC.Base.mbfmap")))
-                                                             Nothing -> (id, id)
+
+                loc         .   ifin                =   maybe 0 id $ getVar @ivar $ vmEqs @lhs.finTyVarMp
+                loc         .   alAppCorArg         =   if @ifin < 0 then id
+                                                           else (!!fromIntegral @ifin) . iterate (acore1App $ acoreVar $ mkHNm "UHC.Base.Just")
+                            .   finFunTy            =   @lhs.finTyVarMp `varUpd` @knFunTy
+                            .   finArgTy            =   @lhs.finTyVarMp `varUpd` @argTy
+                            .   (tyParams', tyRes)  =   appUnArr $ @finFunTy
+                            .   tyParams            =   filter (\t -> case t of Ty_Impls _ -> False; _ -> True) @tyParams'
+                            .   endReturn           =   case @tyRes of Ty_App (Ty_Con c) _ | c == mkHNm "UHC.Base.Maybe" -> id
+                                                                       _ -> acore1App (acoreVar $ mkHNm "UHC.Base.Just")
+                            .   alAppCorFunc        =   let (f:mx:x:ys) = zip (map mkHNm $ mkInfNewUIDL @ivar) (@finFunTy : @finArgTy : @tyParams)
+                                                         in if @ifin >= 0 then (id :: CExpr -> CExpr)
+                                                            else acore1App (acoreLamTy (f:mx:ys) $
+                                                                     acoreApp (acoreVar $ mkHNm "UHC.Base.mbbind")
+                                                                     [ (!!fromIntegral (- @ifin-1)) $ iterate (acore1App $ acoreVar $ mkHNm "UHC.Base.mbjoin") $
+                                                                         acoreVar (fst mx)
+                                                                     , acoreLam1Ty (fst x) (snd x) $ @endReturn $ acoreApp
+                                                                         (acoreVar (fst f)) (acoreVar (fst x) : map (acoreVar.fst) ys)
+                                                                     ]
+                                                                 )
+
                 lhs         .   tyVarMp             =   @prvOccTlVarMp `varUpd` @arg.tyVarMp
 %%]
 

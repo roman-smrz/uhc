@@ -1817,6 +1817,13 @@ GADT: when encountering a product with eq-constraints on the outset, remove them
                        Right e -> case addEquation e (getEqs $ fiVarMpLoc fi) of
                                        Just eqs -> fVar' fBase (fi { fiVarMpLoc = mapEqs (const eqs) (fiVarMpLoc fi) }) updTy t1 ta2
 
+            fBase fi updTy (Ty_ForcedApp ivar inv tf t1) t2
+                | Just (t1a, t1b) <- appMb1Arr t1 = fBase fi updTy (t1a `app1Arr` Ty_ForcedApp ivar inv tf t1b) t2
+                | Just (t2a, t2b) <- appMb1Arr t2 = fBase fi updTy t1 (t2a `app1Arr` Ty_ForcedApp ivar (not inv) tf t2b)
+            fBase fi updTy t1 (Ty_ForcedApp ivar inv tf t2)
+                | Just (t2a, t2b) <- appMb1Arr t2 = fBase fi updTy t1 (t2a `app1Arr` Ty_ForcedApp ivar inv tf t2b)
+                | Just (t1a, t1b) <- appMb1Arr t1 = fBase fi updTy (t1a `app1Arr` Ty_ForcedApp ivar (not inv) tf t1b) t2
+
             fBase fi updTy (Ty_ForcedApp ivar True tf t1) t2 = fBase fi updTy t1 (Ty_ForcedApp ivar False tf t2)
             fBase fi updTy t1 (Ty_ForcedApp ivar True tf t2) = fBase fi updTy (Ty_ForcedApp ivar False tf t1) t2
 
