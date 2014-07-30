@@ -34,7 +34,7 @@ data LinExpr var num = LinExpr [(var, num)] num
 
 data LinEqs var num = LinEqs
     { eqzero :: Map var (LinExpr var num)
-    , geqzero :: [LinExpr var num]
+    , geqzero :: Map var [LinExpr var num]
     , grounded :: Bool
     }
     deriving (Show, Eq, Ord, Typeable, Data)
@@ -55,7 +55,7 @@ instance (Ord var, Eq num, Num num) => Num (LinExpr var num) where
 emptySystem :: LinEqs var num
 emptySystem = LinEqs
     { eqzero = M.empty
-    , geqzero = []
+    , geqzero = M.empty
     , grounded = False
     }
 
@@ -71,7 +71,7 @@ addEquation (LinExpr vars scalar) ds = do
 
 mergeEquations :: (Ord var, Integral num) => LinEqs var num -> LinEqs var num -> LinEqs var num
 mergeEquations eqs1 eqs2 = eqs
-    where eqs1' = eqs1 { geqzero = geqzero eqs1 ++ geqzero eqs2, grounded = grounded eqs1 || grounded eqs2 }
+    where eqs1' = eqs1 { geqzero = M.unionWith (++) (geqzero eqs1) (geqzero eqs2), grounded = grounded eqs1 || grounded eqs2 }
           Just eqs = foldr (\e -> (addEquation e =<<)) (Just eqs1') (M.elems $ eqzero eqs2)
 
 reduceExpr :: (Ord var, Integral num) => Maybe var -> LinEqs var num -> LinExpr var num -> Maybe (LinExpr var num)
@@ -110,14 +110,20 @@ zipVars f ((v,n):xs) ((w,m):ys) | v < w = (v,n) : zipVars f xs ((w,m):ys)
                                                             nm -> (v, nm) : zipVars f xs ys
 
 
-addNonnegative :: LinExpr var num -> LinEqs var num -> LinEqs var num
-addNonnegative expr ds = ds { geqzero = expr : geqzero ds }
+addNonnegative :: Ord var => LinExpr var num -> LinEqs var num -> LinEqs var num
+addNonnegative expr ds = ds {
+    geqzero = foldr (\v -> M.insertWith (++) v [expr]) (geqzero ds) (linExprVars expr)
+    }
 
 groundVar :: (Ord var, Integral num) => var -> LinEqs var num -> (num, LinEqs var num)
 groundVar v ds = case getVar v ds of
                       Just n  -> (n, ds)
-                      Nothing -> let Just ds' = addEquation (LinExpr [(v, 1)] 0) ds
-                                  in (0, ds')
+                      Nothing -> let n = case getVarMinMax ds v of
+                                              (Just l, _) | l > 0 -> l
+                                              (_, Just h) | h < 0 -> h
+                                              _                   -> 0
+                                     Just ds' = addEquation (LinExpr [(v, 1)] (-n)) ds
+                                  in (n, ds' { geqzero = M.delete v (geqzero ds') })
 
 groundVar' :: (Ord var, Integral num) => var -> LinEqs var num -> LinEqs var num
 groundVar' v ds = snd $ groundVar v ds
@@ -126,13 +132,24 @@ groundVars :: (Ord var, Integral num) => [var] -> LinEqs var num -> LinEqs var n
 groundVars vars ds = foldr groundVar' ds vars
 
 groundAllVars :: (Ord var, Integral num) => LinEqs var num -> LinEqs var num
-groundAllVars ds = (foldr groundVar' ds vars) { grounded = True }
-    where vars = foldr merge [] $ map (\(LinExpr vs _) -> map fst vs) $ M.elems $ eqzero ds
-          merge [] ys = ys
+groundAllVars ds = (foldr groundVar' ds $ linEqsVars ds) { grounded = True }
+    where merge [] ys = ys
           merge xs [] = xs
           merge (x:xs) (y:ys) | x < y = x : merge xs (y:ys)
                               | x > y = y : merge (x:xs) ys
                               | otherwise = x : merge xs ys
+
+getVarMinMax :: (Ord var, Integral num) => LinEqs var num -> var -> (Maybe num, Maybe num)
+getVarMinMax ds v = foldl (\(x,y) (x',y') -> (merge max x x', merge min y y')) (Nothing, Nothing)
+            (map bounds $ maybe [] id $ M.lookup v $ geqzero ds)
+    where merge f (Just x) (Just y) = Just (f x y)
+          merge _ mbx      mby      = mplus mbx mby
+          bounds expr = case evalLinExpr ds expr of
+                             Left n | n < 0 -> error "Inequality broken"
+                             Right (LinExpr [(v',n)] m) | v' == v && n /= 0 ->
+                                 if n > 0 then (Just $ (-m+n-1) `div` n, Nothing)
+                                          else (Nothing, Just $ (-m) `div` n)
+                             _ -> (Nothing, Nothing)
 
 
 getVar :: (Ord var, Eq num, Integral num) => var -> LinEqs var num -> Maybe num
@@ -163,11 +180,17 @@ groundExpr expr ds = case evalLinExpr ds expr of
                           Right expr'@(LinExpr ((v,_):_) _) -> groundExpr expr' (groundVar' v ds)
 
 
-linExprVariables :: LinExpr var num -> [var]
-linExprVariables (LinExpr pairs _) = map fst pairs
+linExprVars :: LinExpr var num -> [var]
+linExprVars (LinExpr pairs _) = map fst pairs
 
-linExprVariablesSet :: (Ord var) => LinExpr var num -> S.Set var
-linExprVariablesSet = S.fromAscList . linExprVariables
+linExprVarSet :: (Ord var) => LinExpr var num -> S.Set var
+linExprVarSet = S.fromAscList . linExprVars
+
+linEqsVarSet :: Ord var => LinEqs var num -> S.Set var
+linEqsVarSet ds = S.unions (map linExprVarSet $ M.elems $ eqzero ds) `S.union` (M.keysSet $ geqzero ds)
+
+linEqsVars :: Ord var => LinEqs var num -> [var]
+linEqsVars = S.toList . linEqsVarSet
 
 
 instance (Serialize var, Serialize num) => Serialize (LinExpr var num) where

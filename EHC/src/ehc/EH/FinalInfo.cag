@@ -57,7 +57,7 @@ SEM AGItf
 ATTR AllNT [ finTyVarMp: VarMp  finIterLinEqs: {LinEqs TyVarId Integer} | | ]
 
 SEM AGItf
-  | AGItf       loc         .   finTyVarMp          =   varmpEqMap groundAllVars $
+  | AGItf       loc         .   finTyVarMp          =   varmpGroundAllVars varUpd $
 %%[[9
                                                         @chrSolveSimpTyVarMp `varUpd`
 %%]]

@@ -274,7 +274,8 @@ SEM Expr
                                                                      ]
                                                                  )
 
-                lhs         .   tyVarMp             =   @prvOccTlVarMp `varUpd` @arg.tyVarMp
+                lhs         .   tyVarMp             =   varmpAddUnderExpr (LinExpr [(@ivar,1)] 0) (Ty_Con (mkHNm "UHC.Base.Maybe")) @arg.ty $
+                                                            @prvOccTlVarMp `varUpd` @arg.tyVarMp
 %%]
 
 %%[(9 hmtyinfer).App hs

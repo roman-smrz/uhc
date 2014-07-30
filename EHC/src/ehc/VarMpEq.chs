@@ -7,13 +7,16 @@
 %%[2 import({%{EH}LinEqs}) export(module {%{EH}LinEqs})
 %%]
 
+%%[2 import({%{EH}Base.TermLike},{%{EH}Ty})
+%%]
+
 %%[2 import(qualified Data.Map as Map, qualified Data.Set as Set, Data.Typeable, Data.Data, Control.Monad)
 %%]
 
 %%[2 import(UHC.Util.VarLookup, UHC.Util.Pretty, UHC.Util.AssocL, UHC.Util.Serialize)
 %%]
 
-%%[2 export(VarMpEq(..), EqsLookup(..), varmpEqMap, ppVarMpV , varmpFilter , varmpDel, (|\>) , varmpUnion, varmpUnions , module UHC.Util.VarLookup , mkVarMp , emptyVarMp, varmpIsEmpty , varmpShiftMetaLev, varmpIncMetaLev, varmpDecMetaLev , varmpSelectMetaLev , varmpKeys, varmpKeysSet , varmpMetaLevSingleton, varmpSingleton , assocMetaLevLToVarMp, assocLToVarMp , varmpToAssocL , varmpPlus , varmpLookup , ppVarMp , varmpSize , varmpToMap)
+%%[2 export(VarMpEq(..), EqsLookup(..), varmpEqMap, varmpAddUnderExpr, varmpGroundAllVars,ppVarMpV , varmpFilter , varmpDel, (|\>) , varmpUnion, varmpUnions , module UHC.Util.VarLookup , mkVarMp , emptyVarMp, varmpIsEmpty , varmpShiftMetaLev, varmpIncMetaLev, varmpDecMetaLev , varmpSelectMetaLev , varmpKeys, varmpKeysSet , varmpMetaLevSingleton, varmpSingleton , assocMetaLevLToVarMp, assocLToVarMp , varmpToAssocL , varmpPlus , varmpLookup , ppVarMp , varmpSize , varmpToMap)
 %%]
 
 %%[2
@@ -21,6 +24,7 @@
 data VarMpEq k v = VarMpEq
   { vmMap :: VM.VarMp' k v
   , vmEqs :: LinEqs k Integer
+  , vmUnderExpr :: [(LinExpr k Integer, Ty, Ty)]
   }
   deriving ( Eq, Ord
            , Typeable, Data
@@ -38,7 +42,16 @@ varmpLift :: (VM.VarMp' k v -> VM.VarMp' k v) -> (VarMpEq k v -> VarMpEq k v)
 varmpLift f m = m { vmMap = f (vmMap m) }
 
 varmpEqMap :: (LinEqs k Integer -> LinEqs k Integer) -> (VarMpEq k v -> VarMpEq k v)
-varmpEqMap f (VarMpEq vm eqs) = VarMpEq vm (f eqs)
+varmpEqMap f m = m { vmEqs = f (vmEqs m) }
+
+varmpAddUnderExpr :: Ord k => LinExpr k Integer -> Ty -> Ty -> VarMpEq k v -> VarMpEq k v
+varmpAddUnderExpr expr c t m = m {
+    vmUnderExpr = (expr, c, t) : vmUnderExpr m
+    }
+
+varmpGroundAllVars :: (Ord k, Eq v, Show k) => (VarMpEq k v -> Ty -> Ty) -> VarMpEq k v -> VarMpEq k v
+varmpGroundAllVars upd m = m { vmEqs = groundAllVars $ foldr addNonnegative (vmEqs m) $ map mkFinExpr (vmUnderExpr m) }
+    where mkFinExpr (expr, con, ty) = expr + fromIntegral (length $ takeWhile (==con) $ appUnArrArgs $ upd m ty)
 
 
 -- get the base meta level map, ignore the others
@@ -49,7 +62,7 @@ mkVarMp :: Map.Map k v -> VarMpEq k v
 mkVarMp m = emptyVarMp { vmMap = VM.mkVarMp m }
 
 emptyVarMp :: VarMpEq k v
-emptyVarMp = VarMpEq VM.emptyVarMp emptySystem
+emptyVarMp = VarMpEq VM.emptyVarMp emptySystem []
 
 varmpIsEmpty :: VarMpEq k v -> Bool
 varmpIsEmpty = VM.varmpIsEmpty . vmMap
@@ -134,6 +147,7 @@ instance Ord k => VarLookupCmb (VarMpEq k v) (VarMpEq k v) where
   m1 |+> m2 = VarMpEq
       { vmMap = vmMap m1 |+> vmMap m2
       , vmEqs = vmEqs m1 `mergeEquations` vmEqs m2
+      , vmUnderExpr = vmUnderExpr m1 ++ vmUnderExpr m2
       }
 
 
@@ -157,6 +171,6 @@ instance (PP k, PP v) => PP (VarMpEq k v) where
   pp = ppVarMp (ppCommas')
 
 instance (Ord k, Serialize k, Serialize v) => Serialize (VarMpEq k v) where
-  sput (VarMpEq a b) = sput a >> sput b
-  sget = liftM2 VarMpEq sget sget
+  sput (VarMpEq a b c) = sput a >> sput b >> sput c
+  sget = liftM3 VarMpEq sget sget sget
 %%]

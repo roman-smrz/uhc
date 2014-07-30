@@ -1772,31 +1772,40 @@ GADT: when encountering a product with eq-constraints on the outset, remove them
 
 %%[(7 hmtyinfer).fitsIn.IterApp
             fBase fi updTy (Ty_IterApp e1 (Ty_Con c1) (Ty_IterApp e2 (Ty_Con c2) t1)) t2
-                | c1 == c2 = fVar' fBase fi updTy (Ty_IterApp (e1+e2) (Ty_Con c1) t1) t2
+                | c1 == c2 = fVar' fBase fi { fiVarMpLoc = varmpAddUnderExpr (e1+e2) (Ty_Con c1) t1 $ fiVarMpLoc fi }
+                                updTy (Ty_IterApp (e1+e2) (Ty_Con c1) t1) t2
 
             fBase fi updTy (Ty_IterApp e1 (Ty_Con c1) (Ty_App (Ty_Con c2) t1)) t2
-                | c1 == c2 = fVar' fBase fi updTy (Ty_IterApp (e1+1) (Ty_Con c1) t1) t2
+                | c1 == c2 = fVar' fBase fi { fiVarMpLoc = varmpAddUnderExpr (e1+1) (Ty_Con c1) t1 $ fiVarMpLoc fi }
+                                updTy (Ty_IterApp (e1+1) (Ty_Con c1) t1) t2
 
             fBase fi updTy (Ty_IterApp e1 (Ty_Con c1) t1) (Ty_App (Ty_Con c2) t2)
-                | c1 == c2 = fVar' fBase fi updTy (Ty_IterApp (e1-1) (Ty_Con c1) t1) t2
+                | c1 == c2 = fVar' fBase fi { fiVarMpLoc = varmpAddUnderExpr (e1-1) (Ty_Con c1) t1 $ fiVarMpLoc fi }
+                                updTy (Ty_IterApp (e1-1) (Ty_Con c1) t1) t2
 
             fBase fi updTy t1 (Ty_IterApp e1 (Ty_Con c1) (Ty_IterApp e2 (Ty_Con c2) t2))
-                | c1 == c2 = fVar' fBase fi updTy t1 (Ty_IterApp (e1+e2) (Ty_Con c1) t2)
+                | c1 == c2 = fVar' fBase fi { fiVarMpLoc = varmpAddUnderExpr (e1+e2) (Ty_Con c1) t2 $ fiVarMpLoc fi }
+                                updTy t1 (Ty_IterApp (e1+e2) (Ty_Con c1) t2)
 
             fBase fi updTy t1 (Ty_IterApp e2 (Ty_Con c1) (Ty_App (Ty_Con c2) t2))
-                | c1 == c2 = fVar' fBase fi updTy t1 (Ty_IterApp (e2+1) (Ty_Con c1) t2)
+                | c1 == c2 = fVar' fBase fi { fiVarMpLoc = varmpAddUnderExpr (e2+1) (Ty_Con c1) t2 $ fiVarMpLoc fi }
+                                updTy t1 (Ty_IterApp (e2+1) (Ty_Con c1) t2)
 
             fBase fi updTy (Ty_App (Ty_Con c1) t1) (Ty_IterApp e2 (Ty_Con c2) t2)
-                | c1 == c2 = fVar' fBase fi updTy t1 (Ty_IterApp (e2-1) (Ty_Con c1) t2)
+                | c1 == c2 = fVar' fBase fi { fiVarMpLoc = varmpAddUnderExpr (e2-1) (Ty_Con c1) t2 $ fiVarMpLoc fi }
+                                updTy t1 (Ty_IterApp (e2-1) (Ty_Con c1) t2)
 
             fBase fi updTy (Ty_IterApp e1 (Ty_Con c1) t1) (Ty_IterApp e2 (Ty_Con c2) t2)
-                | c1 == c2 = fVar' fBase fi updTy (Ty_IterApp (e1-e2) (Ty_Con c1) t1) t2
+                | c1 == c2 = fVar' fBase fi { fiVarMpLoc = varmpAddUnderExpr (e1-e2) (Ty_Con c1) t1 $ fiVarMpLoc fi }
+                                updTy (Ty_IterApp (e1-e2) (Ty_Con c1) t1) t2
 
             fBase fi updTy (Ty_IterApp expr tf t1@(Ty_Var _ TyVarCateg_Plain)) t2
-                = fVar' fBase fi updTy t1 (Ty_IterApp (-expr) tf t2)
+                = fVar' fBase fi { fiVarMpLoc = varmpAddUnderExpr (-expr) tf t2 $ fiVarMpLoc fi }
+                                updTy t1 (Ty_IterApp (-expr) tf t2)
 
             fBase fi updTy t1 (Ty_IterApp expr tf t2@(Ty_Var _ TyVarCateg_Plain))
-                = fVar' fBase fi updTy (Ty_IterApp (-expr) tf t1) t2
+                = fVar' fBase fi { fiVarMpLoc = varmpAddUnderExpr (-expr) tf t1 $ fiVarMpLoc fi }
+                                updTy (Ty_IterApp (-expr) tf t1) t2
 
             fBase fi updTy t1@(Ty_IterApp {}) (Ty_ForcedApp ivar False (Ty_Con _) t2) =
                 fVar' fBase (fi { fiVarMpLoc = mapEqs (addNonnegative (LinExpr [(ivar,1::Integer)] 0)) (fiVarMpLoc fi) }) updTy t1 t2
@@ -1804,14 +1813,14 @@ GADT: when encountering a product with eq-constraints on the outset, remove them
                 fVar' fBase (fi { fiVarMpLoc = mapEqs (addNonnegative (LinExpr [(ivar,1::Integer)] 0)) (fiVarMpLoc fi) }) updTy t1 t2
 
             fBase fi updTy t1@(Ty_IterApp expr tf1 ta1) t2
-                = case trm "fi1" ((\p -> p >#< t1 >#< t2) . (either pp $ pp.show)) $ fiEvalExpr fi expr of
+                = case fiEvalExpr fi expr of
                        Left i | i >= 0 -> fVar' fBase fi updTy (iterate (Ty_App tf1) ta1 !! fromIntegral i) t2
                               | otherwise -> fVar' fBase fi updTy ta1 (iterate (Ty_App tf1) t2 !! fromIntegral (-i))
                        Right e -> case addEquation e (getEqs $ fiVarMpLoc fi) of
                                        Just eqs -> fVar' fBase (fi { fiVarMpLoc = mapEqs (const eqs) (fiVarMpLoc fi) }) updTy ta1 t2
 
             fBase fi updTy t1 t2@(Ty_IterApp expr tf2 ta2)
-                = case trm "fi2" ((\p -> p >#< t1 >#< t2) . (either pp $ pp.show)) $ fiEvalExpr fi expr of
+                = case fiEvalExpr fi expr of
                        Left i | i >= 0 -> fVar' fBase fi updTy t1 (iterate (Ty_App tf2) ta2 !! fromIntegral i)
                               | otherwise -> fVar' fBase fi updTy (iterate (Ty_App tf2) t1 !! fromIntegral (-i)) ta2
                        Right e -> case addEquation e (getEqs $ fiVarMpLoc fi) of
@@ -1823,6 +1832,11 @@ GADT: when encountering a product with eq-constraints on the outset, remove them
             fBase fi updTy t1 (Ty_ForcedApp ivar inv tf t2)
                 | Just (t2a, t2b) <- appMb1Arr t2 = fBase fi updTy t1 (t2a `app1Arr` Ty_ForcedApp ivar inv tf t2b)
                 | Just (t1a, t1b) <- appMb1Arr t1 = fBase fi updTy (t1a `app1Arr` Ty_ForcedApp ivar (not inv) tf t1b) t2
+
+            fBase fi updTy (Ty_ForcedApp ivar inv tf t1@(Ty_Var _ TyVarCateg_Plain)) t2
+                = fBase fi updTy t1 (Ty_ForcedApp ivar (not inv) tf t2)
+            fBase fi updTy t1 (Ty_ForcedApp ivar inv tf t2@(Ty_Var _ TyVarCateg_Plain))
+                = fBase fi updTy (Ty_ForcedApp ivar (not inv) tf t1) t2
 
             fBase fi updTy (Ty_ForcedApp ivar True tf t1) t2 = fBase fi updTy t1 (Ty_ForcedApp ivar False tf t2)
             fBase fi updTy t1 (Ty_ForcedApp ivar True tf t2) = fBase fi updTy (Ty_ForcedApp ivar False tf t1) t2
